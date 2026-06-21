@@ -17,7 +17,8 @@
         <div class="mb-5">
             <label class="block text-sm font-semibold text-gray-700 mb-2">농경지 도로명 주소</label>
             <div class="flex gap-2">
-                <input type="text" id="addressInput" readonly placeholder="우측 주소 검색을 이용해 주세요" 
+                <!-- 💡 해결책: 전역변수 대신 태그 자체에 data-bcode 속성을 만들어 법정동코드를 안전하게 보관합니다. -->
+                <input type="text" id="addressInput" readonly data-bcode="" placeholder="우측 주소 검색을 이용해 주세요" 
                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 outline-none cursor-pointer"
                        onclick="openAddrSearch()">
                 <button onclick="openAddrSearch()" class="bg-green-700 hover:bg-green-800 text-white font-bold px-4 py-3 rounded-lg text-sm transition">
@@ -56,24 +57,26 @@
         // ==============================================================
         const KAKAO_REST_API_KEY = "715a0e6e29aab1838d771a4a0a775ae9"; 
 
-        // 사용자가 팝업창에서 주소를 선택했을 때 임시로 값을 보관할 변수들
-        let selectedAddressStr = "";
-        let selectedLawDongCode = ""; // 흙토람용 10자리 법정동코드
-
         // ==============================================================
         // 📬 우편번호 서비스 팝업창 실행 함수
         // ==============================================================
         function openAddrSearch() {
             new daum.Postcode({
                 oncomplete: function(data) {
-                    // 사용자가 주소를 선택했을 때 실행되는 구절
-                    selectedAddressStr = data.roadAddress || data.address; // 도로명 주소 우선 선택
-                    selectedLawDongCode = data.bcode; // 🎯 우체국 제공 10자리 법정동 코드 획득 완료!
+                    const roadAddr = data.roadAddress || data.address; // 도로명 주소 선택
+                    const bcode = data.bcode; // 10자리 법정동 코드
                     
-                    // 화면 입력창에 주소 표시
-                    document.getElementById("addressInput").value = selectedAddressStr;
+                    // 화면 입력창 요소를 가져와 주소와 데이터를 안전하게 매핑합니다.
+                    const inputEl = document.getElementById("addressInput");
+                    inputHepler(inputEl, roadAddr, bcode);
                 }
             }).open();
+        }
+
+        // 입력창 엘리먼트에 직접 데이터를 안전하게 킵(Keep)하는 헬퍼 함수
+        function inputHepler(element, address, bcode) {
+            element.value = address;
+            element.dataset.bcode = bcode; // HTML 태그의 data-bcode 속성에 저장!
         }
 
         // ==============================================================
@@ -190,12 +193,15 @@
         // 🚀 3. 메인 실행 함수
         // ==============================================================
         async function submitRecommendWithAddress() {
-            const address = document.getElementById("addressInput").value;
+            const addressInput = document.getElementById("addressInput");
+            const address = addressInput.value;
+            // 💡 해결책: HTML 태그에 숨겨둔 dataset에서 bcode(법정동코드)를 가져옵니다.
+            const stdgCd = addressInput.dataset.bcode; 
             const crop = document.getElementById("cropInput").value;
             const statusMsg = document.getElementById("statusMsg");
             const submitBtn = document.getElementById("submitBtn");
 
-            if (!address || !selectedLawDongCode) {
+            if (!address || !stdgCd) {
                 alert("농경지 주소 검색을 완료해주세요!");
                 return;
             }
@@ -207,7 +213,7 @@
                 statusMsg.style.display = "block";
                 statusMsg.innerText = "1단계: 주소 좌표화 및 전국 최접근 관측소 탐색 중...";
 
-                // [좌표 변환] 우체국 주소가 100% 유효하므로 카카오 로컬 검색 시 무조건 성공합니다!
+                // [좌표 변환] 카카오 로컬 검색 API 호출
                 const kakaoUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`;
                 const kakaoRes = await fetch(kakaoUrl, {
                     headers: { "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}` }
@@ -219,11 +225,10 @@
                 }
 
                 const locationDoc = kakaoData.documents[0];
-                const userLat = parseFloat(locationDoc.y); // 해당 주소의 실제 위도
-                const userLng = parseFloat(locationDoc.x); // 해당 주소의 실제 경도
-                const stdgCd = selectedLawDongCode; // 📬 Daum 우체국 시스템이 받아온 정확한 10자리 코드 적용
+                const userLat = parseFloat(locationDoc.y); // 실제 위도
+                const userLng = parseFloat(locationDoc.x); // 실제 경도
 
-                // [관측소 매핑] 내 밭의 위경도로부터 대한민국 전국 90여 개 관측소 중 가장 최단거리 매핑
+                // [관측소 매핑] 내 위경도로부터 대한민국 전국 95개 관측소 중 가장 가까운 관측소 매핑
                 let closestStation = ASOS_STATIONS[0];
                 let minDistance = Infinity;
 
