@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bio-recommend-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PUBLIC_DATA_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

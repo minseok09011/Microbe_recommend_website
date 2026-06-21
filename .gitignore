@@ -1,1 +1,3 @@
 ﻿frontend.zip
+backend/node_modules/
+backend/.env

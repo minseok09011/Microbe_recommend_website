@@ -203,6 +203,9 @@
                 });
                 
                 const kakaoData = await kakaoRes.json();
+                if (!kakaoData.documents) {
+                    throw new Error("카카오 주소 검색 API 오류: " + (kakaoData.message || "알 수 없는 오류"));
+                }
                 if (kakaoData.documents.length === 0) {
                     throw new Error("좌표 변환 중 오류가 발생했습니다. 주소를 다시 검색해주세요.");
                 }
@@ -238,7 +241,8 @@
                 // [백엔드 통신]
                 statusMsg.innerText = `2단계: 가장 가까운 [기상청 ${closestStation.name} 관측소(${minDistance.toFixed(1)}km)] 데이터 수집 중...`;
                 
-                const backendBaseUrl = "https://microbe-recommend-website-5jvyw3w6a-ronaldo07.vercel.app";
+                // TODO: Render에 배포 후 실제 서비스 주소로 교체하세요. (예: https://bio-recommend-backend.onrender.com)
+                const backendBaseUrl = "http://localhost:3000";
                 const backendUrl = `${backendBaseUrl}/api/getMergedData?stnId=${stnId}&stationId=${stationId}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
                 
                 const backendRes = await fetch(backendUrl);
