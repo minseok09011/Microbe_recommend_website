@@ -45,6 +45,12 @@ async function fetchAsosHourlyWeather(stnId, dateStr, hourStr) {
     try {
         const response = await fetch(url);
         const data = await response.json();
+
+        const resultCode = data?.response?.header?.resultCode;
+        if (resultCode !== "00") {
+            throw new Error(data?.response?.header?.resultMsg || "ASOS 응답 코드 오류");
+        }
+
         const item = data.response.body.items.item[0];
 
         return {
@@ -60,7 +66,7 @@ async function fetchAsosHourlyWeather(stnId, dateStr, hourStr) {
 }
 
 /**
- * [2] 농촌진흥청 국립농업과학원_농업기상 조회일자별 시간 기본 관측데이터 조회
+ * [2] 농촌진흥청 국립농업과학원_농업기상 조회일자별 10분 상세 관측데이터 조회
  * (이 API는 XML만 응답하므로 필요한 태그만 직접 추출합니다)
  */
 function extractXmlTag(xml, tag) {
@@ -69,23 +75,27 @@ function extractXmlTag(xml, tag) {
     return match ? match[1].trim() : "";
 }
 
-async function fetchAgriHourlyWeather(obsrSpotCd, dateStr, hourStr) {
-    const dateTime = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
-    const url = `https://apis.data.go.kr/1390802/AgriWeather/WeatherObsrInfo/V3/GnrlWeather/getWeatherTimeList3?serviceKey=${API_KEY}&Page_No=1&Page_Size=24&date_Time=${dateTime}&obsr_Spot_Cd=${obsrSpotCd}`;
+async function fetchAgriTenMinWeather(obsrSpotCd, dateStr, hourStr) {
+    const date = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+    const url = `https://apis.data.go.kr/1390802/AgriWeather/WeatherObsrInfo/V4/InsttWeather/getWeatherTenMinList4?serviceKey=${API_KEY}&Page_No=1&Page_Size=144&date=${date}&obsr_Spot_Cd=${obsrSpotCd}`;
 
     try {
         const response = await fetch(url);
         const xml = await response.text();
 
+        if (!xml.includes("<result_Code>200</result_Code>")) {
+            throw new Error(extractXmlTag(xml, "result_Msg") || xml.slice(0, 100) || "농업기상 응답 오류");
+        }
+
         const items = xml.split("<item>").slice(1).map((chunk) => chunk.split("</item>")[0]);
-        const targetItem = items.find((chunk) => extractXmlTag(chunk, "date").endsWith(`${hourStr}:00`)) || items[0];
+        const targetItem = items.find((chunk) => extractXmlTag(chunk, "date_Time").endsWith(`${hourStr}:00`)) || items[0];
 
         return {
-            soilTemp: parseFloat(extractXmlTag(targetItem, "soil_Temp")) || 18.0,
-            soilMoisture: parseFloat(extractXmlTag(targetItem, "soil_Wt")) || 30.0,
+            soilTemp: parseFloat(extractXmlTag(targetItem, "udgr_Tp_10")) || 18.0,
+            soilMoisture: parseFloat(extractXmlTag(targetItem, "soil_Mitr_10")) || 30.0,
         };
     } catch (error) {
-        console.error("❌ 농업기상 API 에러 (백업 구동):", error);
+        console.error("❌ 농업기상 API 에러 (백업 구동):", error.message);
         return { soilTemp: 19.0, soilMoisture: 35.0 };
     }
 }
@@ -134,7 +144,7 @@ app.get("/api/getMergedData", async (req, res) => {
 
         const [asosWeather, agriWeather, soilAnalysis] = await Promise.all([
             fetchAsosHourlyWeather(stnId || "108", dateStr, hourStr),
-            fetchAgriHourlyWeather(stationId, dateStr, hourStr),
+            fetchAgriTenMinWeather(stationId, dateStr, hourStr),
             fetchSoilAnalysis(lat, lng),
         ]);
 
