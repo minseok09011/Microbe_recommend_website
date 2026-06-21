@@ -28,6 +28,14 @@ app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
 
+// 진단용: 키 값 자체는 노출하지 않고 설정 여부/길이만 확인
+app.get("/debug-env", (req, res) => {
+    res.json({
+        hasApiKey: !!API_KEY,
+        apiKeyLength: (API_KEY || "").length,
+    });
+});
+
 /**
  * [1] 기상청 지상(종관, ASOS) 시간자료 조회서비스
  */
@@ -56,6 +64,7 @@ async function fetchAsosHourlyWeather(stnId, dateStr, hourStr) {
  * (이 API는 XML만 응답하므로 필요한 태그만 직접 추출합니다)
  */
 function extractXmlTag(xml, tag) {
+    if (!xml) return "";
     const match = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
     return match ? match[1].trim() : "";
 }
@@ -95,7 +104,7 @@ async function fetchSoilAnalysis(lat, lng) {
         const xml = await response.text();
 
         if (!xml.includes("<resultCode>0</resultCode>")) {
-            throw new Error(extractXmlTag(xml, "resultMsg") || "토양 실측 데이터 없음");
+            throw new Error(extractXmlTag(xml, "resultMsg") || xml.slice(0, 100) || "토양 실측 데이터 없음");
         }
 
         return {
