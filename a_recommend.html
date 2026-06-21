@@ -44,15 +44,13 @@
 
     <script>
         // ==============================================================
-        // 🔑 1. 카카오 REST API 키 (카카오 디벨로퍼스에서 무료 발급 필요)
+        // 🔑 1. 카카오 REST API 키
         // ==============================================================
-        // 주의: 아래 키는 본인의 카카오 REST API 키로 반드시 교체해야 합니다.
         const KAKAO_REST_API_KEY = "715a0e6e29aab1838d771a4a0a775ae9"; 
 
         // ==============================================================
         // 🗺️ 2. 기상청 ASOS 관측소 기초 데이터 (수도권 예시)
         // ==============================================================
-        // 사용자의 좌표(위경도)에서 가장 가까운 관측소를 찾기 위한 데이터입니다.
         const ASOS_STATIONS = [
             { id: "108", name: "서울", lat: 37.5714, lng: 126.9658 },
             { id: "119", name: "수원", lat: 37.2723, lng: 126.9853 },
@@ -60,20 +58,19 @@
             { id: "232", name: "천안", lat: 36.7667, lng: 127.1500 }
         ];
 
-        // 좌표 간의 거리(직선거리)를 계산하는 수학 함수 (하버사인 공식)
         function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-            const R = 6371; // 지구 반지름 (km)
+            const R = 6371; 
             const dLat = (lat2 - lat1) * (Math.PI / 180);
             const dLon = (lon2 - lon1) * (Math.PI / 180);
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
                       Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // 단위: km
+            return R * c; 
         }
 
         // ==============================================================
-        // 🚀 3. 메인 실행 함수 (버튼 클릭 시 작동)
+        // 🚀 3. 메인 실행 함수
         // ==============================================================
         async function submitRecommendWithAddress() {
             const address = document.getElementById("addressInput").value;
@@ -86,7 +83,6 @@
                 return;
             }
 
-
             try {
                 // UI 상태 변경 (로딩 중)
                 submitBtn.disabled = true;
@@ -94,7 +90,7 @@
                 statusMsg.style.display = "block";
                 statusMsg.innerText = "1단계: 주소 변환 및 가장 가까운 관측소 탐색 중...";
 
-                // [단계 1] 카카오 로컬 API 호출 -> 주소를 좌표(x, y)와 법정동코드(b_code)로 변환
+                // [단계 1] 카카오 로컬 API 호출
                 const kakaoUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`;
                 const kakaoRes = await fetch(kakaoUrl, {
                     headers: { "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}` }
@@ -105,13 +101,12 @@
                     throw new Error("주소를 찾을 수 없습니다. 도로명 주소를 정확히 입력해주세요.");
                 }
 
-                // 성공적으로 주소를 찾은 경우 (첫 번째 검색 결과 사용)
                 const locationDoc = kakaoData.documents[0];
-                const userLat = parseFloat(locationDoc.y);  // 위도
-                const userLng = parseFloat(locationDoc.x);  // 경도
-                const stdgCd = locationDoc.address.b_code;  // 🎯 흙토람용 10자리 법정동 코드 획득!
+                const userLat = parseFloat(locationDoc.y); 
+                const userLng = parseFloat(locationDoc.x); 
+                const stdgCd = locationDoc.address.b_code; 
 
-                // [단계 2] 내 위치(위경도)에서 가장 가까운 기상청 관측소(stnId) 찾기
+                // [단계 2] 가장 가까운 기상청 관측소 찾기
                 let closestStation = ASOS_STATIONS[0];
                 let minDistance = Infinity;
 
@@ -123,10 +118,10 @@
                     }
                 });
 
-                const stnId = closestStation.id; // 🎯 기상청 관측소 ID 획득!
-                const stationId = "123"; // 농과원 임시 관측소 ID (실제로는 매핑 테이블 필요)
+                const stnId = closestStation.id; 
+                const stationId = "123"; 
 
-                // [단계 3] 현재 날짜와 시간 구하기 (기상청 API 포맷: YYYYMMDD, HH)
+                // [단계 3] 시간 구하기
                 const now = new Date();
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -134,39 +129,32 @@
                 const hour = String(now.getHours()).padStart(2, '0');
                 
                 const dateStr = `${year}${month}${day}`;
-                const timeStr = `${hour}00`; // 시간은 정시 기준 00분으로 포맷팅
+                const timeStr = `${hour}00`; 
 
-                // [단계 4] 우리 Vercel 백엔드 API로 데이터 요청하기
+                // [단계 4] Vercel 백엔드 호출
                 statusMsg.innerText = "2단계: 기상청 및 흙토람 공공데이터 수집 중...";
                 
-                // 로컬 테스트 시에는 'http://localhost:3000/api/getMergedData' 형태가 될 수 있습니다.
-                // Vercel 배포 후에는 아래처럼 사용합니다.
-                const backendUrl = `/api/getMergedData?stnId=${stnId}&stationId=${stationId}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
+                const backendBaseUrl = "https://microbe-recommend-website-5jvyw3w6a-ronaldo07.vercel.app";
+                const backendUrl = `${backendBaseUrl}/api/getMergedData?stnId=${stnId}&stationId=${stationId}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
                 
-                // 👉 Vercel API 호출!
                 const backendRes = await fetch(backendUrl);
                 if (!backendRes.ok) throw new Error("공공데이터를 불러오는 중 백엔드 에러가 발생했습니다.");
                 
                 const finalMergedData = await backendRes.json();
                 
-                // [단계 5] 완료! 데이터 저장 후 다음 페이지로 이동
+                // [단계 5] 완료
                 statusMsg.innerText = "✅ 수집 완료! 추천 결과를 분석합니다.";
                 
-                // 프론트엔드 임시 저장소에 합쳐진 토양/날씨 데이터를 저장
                 localStorage.setItem("integratedSoilEnvironment", JSON.stringify(finalMergedData));
                 localStorage.setItem("userCrop", crop);
                 
                 console.log("획득한 최종 데이터:", finalMergedData);
                 alert("데이터 수집 완료! 개발자 도구(F12) 콘솔을 확인해보세요.");
                 
-                // 주석 해제 시 실제 결과 페이지로 넘어갑니다.
-                // window.location.href = "a-1_recommend-result.html"; 
-
             } catch (error) {
                 console.error(error);
                 alert(error.message);
             } finally {
-                // UI 복구
                 submitBtn.disabled = false;
                 submitBtn.classList.remove("opacity-50");
                 statusMsg.style.display = "none";
