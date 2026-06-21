@@ -3,58 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미생물 추천받기 - 우리밭 미생물 도우미</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
-    <link rel="stylesheet" href="css/style.css">
+    <title>미생물 추천: 도로명 주소 입력</title>
+    <!-- Tailwind CSS (디자인용) -->
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-50 min-h-screen p-6 font-sans">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-2xl font-bold text-green-700 mb-6">🌱 내 농경지 정보 입력</h1>
+        
+        <!-- 1. 도로명 주소 입력 -->
+        <div class="mb-5">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">농경지 도로명 주소</label>
+            <input type="text" id="addressInput" placeholder="예: 경기도 군포시 산본로 123" 
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
+            <p class="text-xs text-gray-500 mt-1">정확한 날씨와 흙토람 토양 데이터를 불러오기 위해 필요합니다.</p>
+        </div>
 
-<main class="container">
+        <!-- 2. 작물 선택 -->
+        <div class="mb-5">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">키우는 작물</label>
+            <select id="cropInput" class="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none">
+                <option value="tomato">🍅 토마토</option>
+                <option value="pepper">🌶️ 고추</option>
+                <option value="cucumber">🥒 오이</option>
+                <option value="lettuce">🥬 상추</option>
+            </select>
+        </div>
 
-    <header class="page-header">
-        <a href="index.html" class="back-link" aria-label="홈으로">←</a>
-        <h1 class="page-title">🔍 미생물 추천받기</h1>
-    </header>
+        <!-- 3. 추천 버튼 -->
+        <button onclick="submitRecommendWithAddress()" id="submitBtn"
+                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+            데이터 수집 및 미생물 추천받기
+        </button>
 
-    <div class="field">
-        <label class="field__label" for="sido">어디에서 농사 지으세요?</label>
-        <span class="field__hint">먼저 시·도를 고르세요</span>
-        <select id="sido" class="field__select">
-            <option value="">시·도를 고르세요</option>
-        </select>
+        <!-- 진행 상태 표시 -->
+        <div id="statusMsg" class="mt-4 text-sm font-medium text-blue-600 text-center hidden">
+            데이터를 불러오는 중입니다...
+        </div>
     </div>
 
-    <div class="field">
-        <label class="field__label" for="sigungu">시·군·구</label>
-        <select id="sigungu" class="field__select" disabled>
-            <option value="">먼저 시·도를 고르세요</option>
-        </select>
-    </div>
+    <script>
+        // ==============================================================
+        // 🔑 1. 카카오 REST API 키 (카카오 디벨로퍼스에서 무료 발급 필요)
+        // ==============================================================
+        // 주의: 아래 키는 본인의 카카오 REST API 키로 반드시 교체해야 합니다.
+        const KAKAO_REST_API_KEY = "YOUR_KAKAO_REST_API_KEY_HERE"; 
 
-    <div class="field">
-        <label class="field__label" for="crop">무슨 작물 키우세요?</label>
-        <select id="crop" class="field__select">
-            <option value="tomato">🍅 토마토</option>
-            <option value="pepper">🌶️ 고추</option>
-            <option value="cucumber">🥒 오이</option>
-        </select>
-    </div>
+        // ==============================================================
+        // 🗺️ 2. 기상청 ASOS 관측소 기초 데이터 (수도권 예시)
+        // ==============================================================
+        // 사용자의 좌표(위경도)에서 가장 가까운 관측소를 찾기 위한 데이터입니다.
+        const ASOS_STATIONS = [
+            { id: "108", name: "서울", lat: 37.5714, lng: 126.9658 },
+            { id: "119", name: "수원", lat: 37.2723, lng: 126.9853 },
+            { id: "112", name: "인천", lat: 37.4777, lng: 126.6249 },
+            { id: "232", name: "천안", lat: 36.7667, lng: 127.1500 }
+        ];
 
-    <div class="field">
-        <label class="field__label" for="need">무엇이 제일 걱정이세요?</label>
-        <select id="need" class="field__select">
-            <option value="disease">병이 안 생기게 하고 싶어요</option>
-            <option value="growth">작물이 잘 자라게 하고 싶어요</option>
-        </select>
-    </div>
+        // 좌표 간의 거리(직선거리)를 계산하는 수학 함수 (하버사인 공식)
+        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 지구 반지름 (km)
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // 단위: km
+        }
 
-    <button type="button" class="btn btn--primary" onclick="submitRecommend()">
-        미생물 추천 받기 ➔
-    </button>
+        // ==============================================================
+        // 🚀 3. 메인 실행 함수 (버튼 클릭 시 작동)
+        // ==============================================================
+        async function submitRecommendWithAddress() {
+            const address = document.getElementById("addressInput").value;
+            const crop = document.getElementById("cropInput").value;
+            const statusMsg = document.getElementById("statusMsg");
+            const submitBtn = document.getElementById("submitBtn");
 
-</main>
+            if (!address) {
+                alert("농경지 주소를 입력해주세요!");
+                return;
+            }
 
-<script src="js/regions.js"></script>
-<script src="js/app.js"></script>
+            if (KAKAO_REST_API_KEY === "YOUR_KAKAO_REST_API_KEY_HERE") {
+                alert("코드 내부의 KAKAO_REST_API_KEY를 먼저 설정해주세요.");
+                return;
+            }
+
+            try {
+                // UI 상태 변경 (로딩 중)
+                submitBtn.disabled = true;
+                submitBtn.classList.add("opacity-50");
+                statusMsg.style.display = "block";
+                statusMsg.innerText = "1단계: 주소 변환 및 가장 가까운 관측소 탐색 중...";
+
+                // [단계 1] 카카오 로컬 API 호출 -> 주소를 좌표(x, y)와 법정동코드(b_code)로 변환
+                const kakaoUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`;
+                const kakaoRes = await fetch(kakaoUrl, {
+                    headers: { "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}` }
+                });
+                
+                const kakaoData = await kakaoRes.json();
+                if (kakaoData.documents.length === 0) {
+                    throw new Error("주소를 찾을 수 없습니다. 도로명 주소를 정확히 입력해주세요.");
+                }
+
+                // 성공적으로 주소를 찾은 경우 (첫 번째 검색 결과 사용)
+                const locationDoc = kakaoData.documents[0];
+                const userLat = parseFloat(locationDoc.y);  // 위도
+                const userLng = parseFloat(locationDoc.x);  // 경도
+                const stdgCd = locationDoc.address.b_code;  // 🎯 흙토람용 10자리 법정동 코드 획득!
+
+                // [단계 2] 내 위치(위경도)에서 가장 가까운 기상청 관측소(stnId) 찾기
+                let closestStation = ASOS_STATIONS[0];
+                let minDistance = Infinity;
+
+                ASOS_STATIONS.forEach(station => {
+                    const dist = getDistanceFromLatLonInKm(userLat, userLng, station.lat, station.lng);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestStation = station;
+                    }
+                });
+
+                const stnId = closestStation.id; // 🎯 기상청 관측소 ID 획득!
+                const stationId = "123"; // 농과원 임시 관측소 ID (실제로는 매핑 테이블 필요)
+
+                // [단계 3] 현재 날짜와 시간 구하기 (기상청 API 포맷: YYYYMMDD, HH)
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                
+                const dateStr = `${year}${month}${day}`;
+                const timeStr = `${hour}00`; // 시간은 정시 기준 00분으로 포맷팅
+
+                // [단계 4] 우리 Vercel 백엔드 API로 데이터 요청하기
+                statusMsg.innerText = "2단계: 기상청 및 흙토람 공공데이터 수집 중...";
+                
+                // 로컬 테스트 시에는 'http://localhost:3000/api/getMergedData' 형태가 될 수 있습니다.
+                // Vercel 배포 후에는 아래처럼 사용합니다.
+                const backendUrl = `/api/getMergedData?stnId=${stnId}&stationId=${stationId}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
+                
+                // 👉 Vercel API 호출!
+                const backendRes = await fetch(backendUrl);
+                if (!backendRes.ok) throw new Error("공공데이터를 불러오는 중 백엔드 에러가 발생했습니다.");
+                
+                const finalMergedData = await backendRes.json();
+                
+                // [단계 5] 완료! 데이터 저장 후 다음 페이지로 이동
+                statusMsg.innerText = "✅ 수집 완료! 추천 결과를 분석합니다.";
+                
+                // 프론트엔드 임시 저장소에 합쳐진 토양/날씨 데이터를 저장
+                localStorage.setItem("integratedSoilEnvironment", JSON.stringify(finalMergedData));
+                localStorage.setItem("userCrop", crop);
+                
+                console.log("획득한 최종 데이터:", finalMergedData);
+                alert("데이터 수집 완료! 개발자 도구(F12) 콘솔을 확인해보세요.");
+                
+                // 주석 해제 시 실제 결과 페이지로 넘어갑니다.
+                // window.location.href = "a-1_recommend-result.html"; 
+
+            } catch (error) {
+                console.error(error);
+                alert(error.message);
+            } finally {
+                // UI 복구
+                submitBtn.disabled = false;
+                submitBtn.classList.remove("opacity-50");
+                statusMsg.style.display = "none";
+            }
+        }
+    </script>
 </body>
 </html>
