@@ -241,8 +241,7 @@
                 // [백엔드 통신]
                 statusMsg.innerText = `2단계: 가장 가까운 [기상청 ${closestStation.name} 관측소(${minDistance.toFixed(1)}km)] 데이터 수집 중...`;
                 
-                // TODO: Render에 배포 후 실제 서비스 주소로 교체하세요. (예: https://bio-recommend-backend.onrender.com)
-                const backendBaseUrl = "http://localhost:3000";
+                const backendBaseUrl = "https://microbe-recommend-website.onrender.com";
                 const backendUrl = `${backendBaseUrl}/api/getMergedData?stnId=${stnId}&stationId=${stationId}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
                 
                 const backendRes = await fetch(backendUrl);
