@@ -51,93 +51,8 @@
         const KAKAO_REST_API_KEY = "715a0e6e29aab1838d771a4a0a775ae9"; 
 
         // ==============================================================
-        // 🗺️ 2. 기상청 ASOS 관측소 기초 데이터 (전국 95개 관측소)
+        // 🗺️ 2. 거리 계산 (위경도 기반)
         // ==============================================================
-        const ASOS_STATIONS = [
-            { id: "108", name: "서울", lat: 37.5714, lng: 126.9658 },
-            { id: "119", name: "수원", lat: 37.2723, lng: 126.9853 },
-            { id: "112", name: "인천", lat: 37.4777, lng: 126.6249 },
-            { id: "201", name: "강화", lat: 37.7074, lng: 126.4463 },
-            { id: "102", name: "백령도", lat: 37.9625, lng: 124.6305 },
-            { id: "98", name: "동두천", lat: 37.9019, lng: 127.0607 },
-            { id: "99", name: "파주", lat: 37.8859, lng: 126.7665 },
-            { id: "202", name: "양평", lat: 37.4886, lng: 127.4945 },
-            { id: "203", name: "이천", lat: 37.2640, lng: 127.4842 },
-            { id: "90", name: "속초", lat: 38.2509, lng: 128.5647 },
-            { id: "93", name: "북춘천", lat: 37.9475, lng: 127.7547 },
-            { id: "95", name: "철원", lat: 38.1479, lng: 127.3042 },
-            { id: "101", name: "춘천", lat: 37.9026, lng: 127.7357 },
-            { id: "104", name: "북강릉", lat: 37.8046, lng: 128.8554 },
-            { id: "105", name: "강릉", lat: 37.7515, lng: 128.8910 },
-            { id: "100", name: "대관령", lat: 37.6771, lng: 128.7183 },
-            { id: "106", name: "동해", lat: 37.5071, lng: 129.1243 },
-            { id: "114", name: "원주", lat: 37.3375, lng: 127.9463 },
-            { id: "211", name: "인제", lat: 38.0597, lng: 128.1661 },
-            { id: "212", name: "홍천", lat: 37.6836, lng: 127.8804 },
-            { id: "216", name: "정선군", lat: 37.3789, lng: 128.6650 },
-            { id: "217", name: "영월", lat: 37.1813, lng: 128.4610 },
-            { id: "214", name: "태백", lat: 37.1714, lng: 128.9850 },
-            { id: "232", name: "천안", lat: 36.7667, lng: 127.1500 },
-            { id: "131", name: "청주", lat: 36.6392, lng: 127.4406 },
-            { id: "133", name: "대전", lat: 36.3720, lng: 127.3721 },
-            { id: "129", name: "서산", lat: 36.7766, lng: 126.4939 },
-            { id: "235", name: "보령", lat: 36.3274, lng: 126.5430 },
-            { id: "236", name: "부여", lat: 36.2740, lng: 126.9123 },
-            { id: "238", name: "금산", lat: 36.1086, lng: 127.4842 },
-            { id: "135", name: "추풍령", lat: 36.2203, lng: 127.9946 },
-            { id: "226", name: "보은", lat: 36.4259, lng: 127.7311 },
-            { id: "221", name: "제천", lat: 37.1642, lng: 128.1963 },
-            { id: "239", name: "세종", lat: 36.4833, lng: 127.2833 },
-            { id: "127", name: "충주", lat: 36.9853, lng: 127.9547 },
-            { id: "146", name: "전주", lat: 35.8244, lng: 127.1500 },
-            { id: "156", name: "광주", lat: 35.1729, lng: 126.8916 },
-            { id: "140", name: "군산", lat: 35.9725, lng: 126.7107 },
-            { id: "243", name: "정읍", lat: 35.5684, lng: 126.8525 },
-            { id: "244", name: "남원", lat: 35.4124, lng: 127.3915 },
-            { id: "165", name: "목포", lat: 34.8171, lng: 126.3813 },
-            { id: "168", name: "여수", lat: 34.7633, lng: 127.6622 },
-            { id: "251", name: "고창군", lat: 35.4259, lng: 126.7011 },
-            { id: "253", name: "김제", lat: 35.8011, lng: 126.8823 },
-            { id: "254", name: "순창군", lat: 35.3714, lng: 127.1376 },
-            { id: "259", name: "강진군", lat: 34.6406, lng: 126.7686 },
-            { id: "260", name: "장흥", lat: 34.6811, lng: 126.9197 },
-            { id: "261", name: "해남", lat: 34.5539, lng: 126.5989 },
-            { id: "262", name: "고흥", lat: 34.6059, lng: 127.2831 },
-            { id: "174", name: "순천", lat: 34.9463, lng: 127.4842 },
-            { id: "266", name: "광양시", lat: 34.9733, lng: 127.6912 },
-            { id: "252", name: "영광군", lat: 35.2774, lng: 126.5122 },
-            { id: "255", name: "무안군", lat: 34.9904, lng: 126.4811 },
-            { id: "257", name: "양양", lat: 38.0754, lng: 128.6189 },
-            { id: "143", name: "대구", lat: 35.8779, lng: 128.6529 },
-            { id: "159", name: "부산", lat: 35.1047, lng: 129.0320 },
-            { id: "152", name: "울산", lat: 35.5820, lng: 129.3338 },
-            { id: "136", name: "안동", lat: 36.5724, lng: 128.7107 },
-            { id: "137", name: "상주", lat: 36.4069, lng: 128.1581 },
-            { id: "271", name: "봉화", lat: 36.8859, lng: 128.7423 },
-            { id: "272", name: "영주", lat: 36.8066, lng: 128.6277 },
-            { id: "273", name: "문경", lat: 36.5861, lng: 128.1883 },
-            { id: "277", name: "영덕", lat: 36.4059, lng: 129.3774 },
-            { id: "278", name: "의성", lat: 36.3533, lng: 128.6911 },
-            { id: "279", name: "구미", lat: 36.1136, lng: 128.3533 },
-            { id: "281", name: "영천", lat: 35.9723, lng: 128.9312 },
-            { id: "283", name: "경주시", lat: 35.8244, lng: 129.2114 },
-            { id: "155", name: "창원", lat: 35.2281, lng: 128.6811 },
-            { id: "162", name: "통영", lat: 34.8512, lng: 128.4320 },
-            { id: "284", name: "거창", lat: 35.6859, lng: 127.9122 },
-            { id: "285", name: "합천", lat: 35.5684, lng: 128.1581 },
-            { id: "288", name: "밀양", lat: 35.4922, lng: 128.7511 },
-            { id: "289", name: "산청", lat: 35.4123, lng: 127.8732 },
-            { id: "294", name: "거제", lat: 34.8806, lng: 128.6211 },
-            { id: "295", name: "남해", lat: 34.8383, lng: 127.9250 },
-            { id: "192", name: "진주", lat: 35.1729, lng: 128.0833 },
-            { id: "115", name: "울릉도", lat: 37.4813, lng: 130.8986 },
-            { id: "130", name: "울진", lat: 36.9912, lng: 129.4122 },
-            { id: "184", name: "제주", lat: 33.5141, lng: 126.5297 },
-            { id: "185", name: "고산", lat: 33.2922, lng: 126.1623 },
-            { id: "188", name: "성산", lat: 33.3854, lng: 126.8804 },
-            { id: "189", name: "서귀포", lat: 33.2462, lng: 126.5653 }
-        ];
-
         function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -170,7 +85,7 @@
                 submitBtn.disabled = true;
                 submitBtn.classList.add("opacity-50");
                 statusMsg.style.display = "block";
-                statusMsg.innerText = "1단계: 전국 최접근 관측소 탐색 중...";
+                statusMsg.innerText = "1단계: 주소 좌표 변환 중...";
 
                 // 입력한 주소(도로명 또는 지번)를 카카오 주소 검색으로 좌표+법정동코드 변환
                 // (도로명주소가 없는 농지 지번도 지번 검색으로 정확히 매칭됩니다)
@@ -191,20 +106,6 @@
                 const userLat = parseFloat(matched.y);
                 const userLng = parseFloat(matched.x);
                 const stdgCd = matched.address ? matched.address.b_code : "";
-
-                // [관측소 매핑] 내 밭의 위경도로부터 대한민국 전국 95개 관측소 중 가장 가까운 관측소 매핑
-                let closestStation = ASOS_STATIONS[0];
-                let minDistance = Infinity;
-
-                ASOS_STATIONS.forEach(station => {
-                    const dist = getDistanceFromLatLonInKm(userLat, userLng, station.lat, station.lng);
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        closestStation = station;
-                    }
-                });
-
-                const stnId = closestStation.id;
 
                 // [관측지점 매핑] 내 밭의 위경도로부터 농업기상 관측지점(215개) 중 가장 가까운 지점 매핑
                 let closestAgriStation = AGRI_STATIONS[0];
@@ -231,10 +132,10 @@
                 const timeStr = `${hour}00`; 
 
                 // [백엔드 통신]
-                statusMsg.innerText = `2단계: 가장 가까운 [기상청 ${closestStation.name} 관측소(${minDistance.toFixed(1)}km)] / [농업기상 ${closestAgriStation.name} 관측지점(${minAgriDistance.toFixed(1)}km)] 데이터 수집 중...`;
-                
+                statusMsg.innerText = `2단계: 가장 가까운 [농업기상 ${closestAgriStation.name} 관측지점(${minAgriDistance.toFixed(1)}km)] 데이터 수집 중...`;
+
                 const backendBaseUrl = "https://microbe-recommend-website.onrender.com";
-                const backendUrl = `${backendBaseUrl}/api/getMergedData?stnId=${stnId}&stationId=${stationId}&lat=${userLat}&lng=${userLng}&dateStr=${dateStr}&timeStr=${timeStr}`;
+                const backendUrl = `${backendBaseUrl}/api/getMergedData?stationId=${stationId}&lat=${userLat}&lng=${userLng}&dateStr=${dateStr}&timeStr=${timeStr}`;
                 
                 const backendRes = await fetch(backendUrl);
                 if (!backendRes.ok) throw new Error("공공데이터를 불러오는 중 백엔드 에러가 발생했습니다.");
@@ -249,7 +150,7 @@
                 localStorage.setItem("userStdgCd", stdgCd);
                 
                 console.log("획득한 최종 데이터:", finalMergedData);
-                alert(`데이터 수집 완료!\n\n📍 위치: ${address}\n☁️ 기상 매칭: ${closestStation.name} 관측소 (약 ${minDistance.toFixed(1)}km)\n🌱 농업기상 매칭: ${closestAgriStation.name} 관측지점 (약 ${minAgriDistance.toFixed(1)}km)\n📂 개발자 도구(F12) 콘솔에서 데이터 확인 가능`);
+                alert(`데이터 수집 완료!\n\n📍 위치: ${address}\n🌱 농업기상 매칭: ${closestAgriStation.name} 관측지점 (약 ${minAgriDistance.toFixed(1)}km)\n📂 개발자 도구(F12) 콘솔에서 데이터 확인 가능`);
                 
             } catch (error) {
                 console.error(error);

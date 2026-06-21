@@ -37,37 +37,10 @@ app.get("/debug-env", (req, res) => {
 });
 
 /**
- * [1] 기상청 지상(종관, ASOS) 시간자료 조회서비스
- */
-async function fetchAsosHourlyWeather(stnId, dateStr, hourStr) {
-    const url = `https://apis.data.go.kr/1360000/AsosHourlyInfoService/getWthrDataList?serviceKey=${API_KEY}&pageNo=1&numOfRows=10&dataType=JSON&dataCd=ASOS&dateCd=HR&stnIds=${stnId}&startDt=${dateStr}&startHh=${hourStr}&endDt=${dateStr}&endHh=${hourStr}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        const resultCode = data?.response?.header?.resultCode;
-        if (resultCode !== "00") {
-            throw new Error(data?.response?.header?.resultMsg || "ASOS 응답 코드 오류");
-        }
-
-        const item = data.response.body.items.item[0];
-
-        return {
-            airTemp: parseFloat(item.ta) || 20.0,
-            rain: parseFloat(item.rn) || 0.0,
-            sunshine: parseFloat(item.ss) || 0.0,
-            solarRadiation: parseFloat(item.icsr) || 0.0,
-        };
-    } catch (error) {
-        console.error("❌ 기상청 ASOS API 에러 (백업 구동):", error);
-        return { airTemp: 21.0, rain: 0.0, sunshine: 5.0, solarRadiation: 1.2 };
-    }
-}
-
-/**
- * [2] 농촌진흥청 국립농업과학원_농업기상 조회일자별 10분 상세 관측데이터 조회
+ * [1] 농촌진흥청 국립농업과학원_농업기상 조회일자별 10분 상세 관측데이터 조회
  * (이 API는 XML만 응답하므로 필요한 태그만 직접 추출합니다)
+ * 기온·강수량·일사량까지 이 API 하나로 받아옵니다 (기상청 ASOS는 전날 자료까지만
+ * 제공해서 제외했습니다 — 이 API도 당일 데이터는 약간 지연될 수 있습니다)
  */
 function extractXmlTag(xml, tag) {
     if (!xml) return "";
@@ -91,12 +64,15 @@ async function fetchAgriTenMinWeather(obsrSpotCd, dateStr, hourStr) {
         const targetItem = items.find((chunk) => extractXmlTag(chunk, "date_Time").endsWith(`${hourStr}:00`)) || items[0];
 
         return {
+            airTemp: parseFloat(extractXmlTag(targetItem, "tmprt_150")) || 20.0,
+            rain: parseFloat(extractXmlTag(targetItem, "rn")) || 0.0,
+            solarRadiation: parseFloat(extractXmlTag(targetItem, "srqty")) || 1.2,
             soilTemp: parseFloat(extractXmlTag(targetItem, "udgr_Tp_10")) || 18.0,
             soilMoisture: parseFloat(extractXmlTag(targetItem, "soil_Mitr_10")) || 30.0,
         };
     } catch (error) {
         console.error("❌ 농업기상 API 에러 (백업 구동):", error.message);
-        return { soilTemp: 19.0, soilMoisture: 35.0 };
+        return { airTemp: 21.0, rain: 0.0, solarRadiation: 1.2, soilTemp: 19.0, soilMoisture: 35.0 };
     }
 }
 
@@ -131,7 +107,7 @@ async function fetchSoilAnalysis(lat, lng) {
 }
 
 app.get("/api/getMergedData", async (req, res) => {
-    const { stnId, stationId, lat, lng, dateStr, timeStr } = req.query;
+    const { stationId, lat, lng, dateStr, timeStr } = req.query;
 
     if (!lat || !lng || !dateStr || !timeStr) {
         return res.status(400).json({ error: "lat, lng, dateStr, timeStr는 필수 파라미터입니다." });
@@ -142,16 +118,15 @@ app.get("/api/getMergedData", async (req, res) => {
 
         const hourStr = timeStr.slice(0, 2); // "1200" -> "12"
 
-        const [asosWeather, agriWeather, soilAnalysis] = await Promise.all([
-            fetchAsosHourlyWeather(stnId || "108", dateStr, hourStr),
+        const [agriWeather, soilAnalysis] = await Promise.all([
             fetchAgriTenMinWeather(stationId, dateStr, hourStr),
             fetchSoilAnalysis(lat, lng),
         ]);
 
         const finalIntegratedData = {
-            airTemp: asosWeather.airTemp,
-            rain: asosWeather.rain,
-            solarRadiation: asosWeather.solarRadiation,
+            airTemp: agriWeather.airTemp,
+            rain: agriWeather.rain,
+            solarRadiation: agriWeather.solarRadiation,
             soilTemp: agriWeather.soilTemp,
             soilMoisture: agriWeather.soilMoisture,
             soilPh: soilAnalysis.soilPh,
