@@ -132,7 +132,7 @@
                 const timeStr = `${hour}00`; 
 
                 // [백엔드 통신]
-                statusMsg.innerText = `2단계: 가장 가까운 [농업기상 ${closestAgriStation.name} 관측지점(${minAgriDistance.toFixed(1)}km)] 데이터 수집 중...`;
+                statusMsg.innerText = "2단계: 기상·토양 데이터 수집 중...";
 
                 const backendBaseUrl = "https://microbe-recommend-website.onrender.com";
                 const backendUrl = `${backendBaseUrl}/api/getMergedData?stationId=${stationId}&lat=${userLat}&lng=${userLng}&stdgCd=${stdgCd}&dateStr=${dateStr}&timeStr=${timeStr}`;
@@ -144,14 +144,17 @@
                 
                 // [완료 처리 및 로컬 저장]
                 statusMsg.innerText = "✅ 수집 완료! 추천 결과를 분석합니다.";
-                
+
                 localStorage.setItem("integratedSoilEnvironment", JSON.stringify(finalMergedData));
                 localStorage.setItem("userCrop", crop);
                 localStorage.setItem("userStdgCd", stdgCd);
-                
+                localStorage.setItem("userAddress", address);
+
                 console.log("획득한 최종 데이터:", finalMergedData);
-                alert(`데이터 수집 완료!\n\n📍 위치: ${address}\n🌱 농업기상 매칭: ${closestAgriStation.name} 관측지점 (약 ${minAgriDistance.toFixed(1)}km)\n📂 개발자 도구(F12) 콘솔에서 데이터 확인 가능`);
-                
+
+                window.location.href = "a-1_recommend-result.html";
+                return;
+
             } catch (error) {
                 console.error(error);
                 alert(error.message);

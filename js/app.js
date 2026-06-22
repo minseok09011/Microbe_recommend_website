@@ -103,64 +103,93 @@ const SPRAY_LABEL = {
 };
 
 /* ------------------------------------------------------------
-   a-1: 추천 결과 — 임시 데이터로 미생물 카드 표시
-   ※ 실제로는 백엔드가 토양·작물에 맞춰 계산해 줍니다.
-      예) fetch(`/api/recommend?crop=${crop}&need=${need}&loc=${loc}`)
+   a-1: 추천 결과 — /api/recommendMicrobe(RAG+LLM) 호출 결과 표시
+   a_recommend.html에서 모아둔 토양·기상 데이터(localStorage)를
+   바탕으로 백엔드에 추천을 요청합니다.
    ------------------------------------------------------------ */
-function renderRecommendResult() {
+const RECOMMEND_BACKEND_BASE_URL = "https://microbe-recommend-website.onrender.com";
+
+async function renderRecommendResult() {
     const crop = localStorage.getItem("userCrop") || "tomato";
-    const need = localStorage.getItem("userNeed") || "disease";
-    const loc = localStorage.getItem("userLocation") || "";
+    const address = localStorage.getItem("userAddress") || "";
+    const envRaw = localStorage.getItem("integratedSoilEnvironment");
 
-    // ── 임시(가짜) 추천 데이터 — 나중에 API 응답으로 교체 ──
-    const FAKE_DB = {
-        disease: {
-            name: "바실러스 미생물",
-            sci: "Bacillus subtilis",
-            effect: "잎과 뿌리에 생기는 나쁜 곰팡이를 막아, 탄저병·잿빛곰팡이 같은 병을 줄여 줍니다.",
-            price: "1만 5천원 ~ 2만원 (1L)",
-            product: "○○바이오 강력방제"
-        },
-        growth: {
-            name: "트리코더마 미생물",
-            sci: "Trichoderma harzianum",
-            effect: "뿌리를 잘 내리게 하고 흙을 부드럽게 만들어, 작물이 튼튼하게 자라도록 도와줍니다.",
-            price: "1만 2천원 ~ 1만 8천원 (1L)",
-            product: "△△그린 뿌리튼튼"
-        }
-    };
-    const rec = FAKE_DB[need] || FAKE_DB.disease;
-
-    // 요약 칩
     const summary = document.getElementById("summary");
+    const resultEl = document.getElementById("recommendResult");
+
     if (summary) {
         summary.innerHTML =
             `<span class="summary__chip">${CROP_LABEL[crop] || crop}</span>` +
-            `<span class="summary__chip">${NEED_LABEL[need] || need}</span>` +
-            (loc ? `<span class="summary__chip">📍 ${loc}</span>` : "");
+            (address ? `<span class="summary__chip">📍 ${address}</span>` : "");
     }
 
-    // 미생물 카드
-    document.getElementById("recommendResult").innerHTML = `
-        <div class="result-card">
-            <span class="result-card__badge">👍 가장 추천해요</span>
-            <h2 class="result-card__name">${rec.name}</h2>
-            <p class="result-card__sci">${rec.sci}</p>
-            <p class="result-card__effect">${rec.effect}</p>
-            <div class="result-card__row">
-                <span class="label">가격대</span>
-                <span class="value">${rec.price}</span>
-            </div>
-            <div class="result-card__row">
-                <span class="label">추천 제품</span>
-                <span class="value">${rec.product}</span>
-            </div>
-        </div>
-        <p class="notice">
-            ※ 지금 보이는 내용은 <b>예시</b>예요. 곧 우리 밭 흙과 날씨에 맞춘
-            진짜 추천으로 바뀝니다.
-        </p>
-    `;
+    if (!envRaw) {
+        resultEl.innerHTML = `<p class="notice">먼저 <a href="a_recommend.html">농경지 정보를 입력</a>해주세요.</p>`;
+        return;
+    }
+
+    const env = JSON.parse(envRaw);
+    resultEl.innerHTML = `<p class="notice">🔬 우리 밭 데이터에 맞는 미생물을 분석하는 중입니다...</p>`;
+
+    const params = new URLSearchParams({
+        crop,
+        soilPh: env.soilPh,
+        soilOrganic: env.soilOrganic,
+        soilPhosphate: env.soilPhosphate,
+        soilPotassium: env.soilPotassium,
+        soilCalcium: env.soilCalcium,
+        soilMagnesium: env.soilMagnesium,
+        soilMoisture: env.soilMoisture,
+        airTemp: env.airTemp,
+        rain: env.rain,
+    });
+
+    try {
+        const res = await fetch(`${RECOMMEND_BACKEND_BASE_URL}/api/recommendMicrobe?${params}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "추천 요청 중 오류가 발생했습니다.");
+
+        const cards = data.microbes.map((m) => {
+            const v = m.vendorInfo;
+            return `
+                <div class="result-card">
+                    <span class="result-card__badge">👍 추천 미생물</span>
+                    <h2 class="result-card__name">${m.species}</h2>
+                    ${v ? `
+                        <div class="result-card__row">
+                            <span class="label">가격대</span>
+                            <span class="value">${v.priceMin ? v.priceMin.toLocaleString() + "원 ~ " + v.priceMax.toLocaleString() + "원" : "정보 없음"}</span>
+                        </div>
+                        <div class="result-card__row">
+                            <span class="label">등록 제품 수</span>
+                            <span class="value">${v.productCount}개</span>
+                        </div>
+                        <div class="result-card__row">
+                            <span class="label">식약처 등록</span>
+                            <span class="value">${v.mfdsRegistered ? "등록됨" : "미등록"}</span>
+                        </div>
+                    ` : `<p class="result-card__effect">판매처 정보가 아직 등록되지 않은 균종입니다.</p>`}
+                </div>
+            `;
+        }).join("");
+
+        const sourcesList = data.sources.map((s) =>
+            `<li>${s.title} <span class="value">(${s.journal}, ${s.year})</span></li>`
+        ).join("");
+
+        resultEl.innerHTML = `
+            ${cards}
+            <p class="result-card__effect">${data.explanation}</p>
+            ${data.quotaExceeded ? `<p class="notice">⚠️ AI 무료 사용량 한도에 도달해 추천 균종 목록은 비어 있습니다. 잠시 후 다시 시도해주세요.</p>` : ""}
+            <details class="notice">
+                <summary>참고 논문 ${data.sources.length}건 보기</summary>
+                <ul>${sourcesList}</ul>
+            </details>
+        `;
+    } catch (error) {
+        console.error(error);
+        resultEl.innerHTML = `<p class="notice">⚠️ ${error.message}</p>`;
+    }
 }
 
 /* ------------------------------------------------------------
