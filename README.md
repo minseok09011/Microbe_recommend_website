@@ -4,7 +4,7 @@
 
 ## 현재 구현 범위
 
-도로명/지번 주소와 작물을 입력하면, 그 농경지의 토양·기상 데이터를 공공 API에서 실시간으로 받아오는 부분까지 구현되어 있습니다. (받아온 데이터로 미생물을 추천하는 RAG/LLM 단계는 아직 없습니다.)
+도로명/지번 주소와 작물을 입력하면, 그 농경지의 토양·기상 데이터를 공공 API에서 실시간으로 받아오고, 그 데이터를 바탕으로 A등급 논문 1,764편 중 관련 근거를 검색해 LLM이 추천 미생물과 근거 설명을 생성한 뒤, 판매처 정보까지 붙여 보여줍니다.
 
 ## 전체 흐름
 
@@ -17,7 +17,7 @@
      가장 가까운 지점을 매칭
   4. 백엔드(Render)에 위경도 + 법정동코드 + 관측지점코드 + 날짜/시각 전달
         ↓
-[백엔드: backend/server.js, Render]
+[백엔드: backend/server.js, Render — /api/getMergedData]
   5. 농업기상 API(10분 상세관측)로 기온·강수량·일사량·지중온도·지중수분 조회
   6. 토양 데이터는 정밀도 순으로 3단계로 조회:
      a) 좌표 기반 팜맵 토양검정 API로 그 필지의 실측값 조회 (있으면 사용)
@@ -28,7 +28,25 @@
      soilDataSource 필드로 "실측값"/"지역 추정값"/"전국 평균값" 표시)
         ↓
 [브라우저]
-  8. 응답 JSON을 localStorage에 저장, 콘솔(F12)에서 확인 가능
+  8. 응답 JSON을 localStorage에 저장하고 a-1_recommend-result.html로 이동
+        ↓
+[백엔드: backend/server.js, Render — /api/recommendMicrobe]
+  9. 토양/기상 수치를 등급 구간 기반으로 "산성/중성", "낮음/보통/높음" 같은
+     영어 정성 서술 질의문으로 변환 (LLM·임베딩 모델은 숫자보다 이런 서술을
+     더 잘 이해함)
+  10. Voyage AI(voyage-multilingual-2)로 질의문을 임베딩하고, 미리 임베딩해둔
+      논문 청크 49,003개(A등급 논문 1,764편) 인덱스에서 코사인 유사도로
+      관련 청크 8개를 검색
+  11. Gemini(gemini-3.1-flash-lite, 무료 티어)에게 검색된 논문 발췌 + 환경
+      데이터를 주고, 추천 미생물 학명과 한국어 근거 설명을 생성하게 함
+  12. 추천된 학명을 backend/microbe_master.csv(국내 등록 미생물 제품
+      판매처/가격/식약처 등록 여부)와 매칭
+  13. 무료 API 사용량 한도 초과(HTTP 429) 시에는 에러 대신 검색된 논문
+      목록만 보여주고 quotaExceeded: true 플래그를 응답에 포함
+        ↓
+[브라우저: a-1_recommend-result.html]
+  14. 추천 미생물 카드(가격대/제품 수/식약처 등록 여부) + AI 설명 +
+      참고 논문 목록을 렌더링
 ```
 
 ## 주소 처리
@@ -43,47 +61,44 @@
 | 토양 산도·유기물·유효인산·유효규산·전기전도도 (실측값) | 농림수산식품교육문화정보원_팜맵기반 토양검정 조회 서비스 (`getCoordinateBasedSoilAnalsInfo`) | 좌표(EPSG:5179) | 등록된 팜맵 필지 안의 좌표여야 값이 나옴 |
 | 토양 산도·유기물·유효인산·칼륨·칼슘·마그네슘·유효규산 (법정동 추정값) | 농촌진흥청 국립농업과학원_농경지화학성 통계정보 V2 (`getFarmExamPhInfo` 등 7개 오퍼레이션) | 법정동코드(10자리) | 등급별 면적(ha) 통계. 위 실측 API가 NODATA일 때만 사용 |
 
+## 미생물 추천(RAG + LLM) 인덱스
+
+- 논문 청크/벡터 인덱스(`chunks.jsonl` 167MB, `vectors.f32` 200MB)는 GitHub Release(`paper-index-a-grade-v1`)에 올려두고, 백엔드가 처음 뜰 때 다운로드합니다 (`backend/data/`는 git에 커밋하지 않음).
+- 메모리가 적은 인스턴스에서도 돌도록, 청크 본문은 메모리에 전부 올리지 않고 파일에서 필요한 부분만 그때그때 읽습니다. 벡터는 코사인 유사도 전체 스캔이 필요해 메모리에 올립니다.
+- 인덱스를 처음부터 다시 만들 때는 `backend/scripts/buildPaperIndex.js`로 청크 분할 + Voyage 임베딩을 실행합니다.
+
 ## 폴더 구조
 
 ```
 .
-├── a_recommend.html         # 주소+작물 입력 화면 (실제 API 연동 구현됨)
-├── a-1_recommend-result.html
+├── a_recommend.html         # 주소+작물 입력 화면
+├── a-1_recommend-result.html  # 추천 결과 화면 (실제 API 연동)
 ├── b_spray.html
 ├── b-1_spray-result.html
 ├── index.html
 ├── css/style.css
 ├── js/
-│   ├── app.js                # 나머지 화면들의 임시(가짜) 데이터 렌더링
+│   ├── app.js                # 결과 화면 렌더링 (a-1은 실제 API, b/b-1은 임시 데이터)
 │   ├── regions.js
 │   └── agriStations.js       # 자동 생성된 농업기상 관측지점 좌표 목록
 └── backend/                  # Render에 배포되는 Express 서버
     ├── server.js
+    ├── microbe_master.csv    # 미생물 종별 판매처/가격/식약처 등록 정보
     ├── package.json
     ├── render.yaml
     ├── .env.example
     └── scripts/
-        └── buildAgriStations.js  # agriStations.js 재생성 스크립트
+        ├── buildAgriStations.js  # agriStations.js 재생성 스크립트
+        └── buildPaperIndex.js    # 논문 청크 분할 + Voyage 임베딩 인덱스 생성
 ```
 
 ## 배포
 
 - 프론트엔드: GitHub Pages (저장소 루트, 정적 파일)
 - 백엔드: Render (Web Service, Root Directory `backend`, Build `npm install`, Start `npm start`)
-- 백엔드 환경변수: `PUBLIC_DATA_API_KEY`(공공데이터포털 인증키), `ALLOWED_ORIGINS`(CORS 허용 도메인)
-
-## 로컬 실행
-
-```
-cd backend
-npm install
-node server.js   # http://localhost:3000
-```
-
-`a_recommend.html`의 `backendBaseUrl`을 `http://localhost:3000`으로 바꾸면 로컬 백엔드로 테스트할 수 있습니다.
+- 백엔드 환경변수: `PUBLIC_DATA_API_KEY`(공공데이터포털 인증키), `ALLOWED_ORIGINS`(CORS 허용 도메인), `VOYAGE_API_KEY`(Voyage AI 임베딩), `GEMINI_API_KEY`(Gemini 추천 설명 생성, 무료 티어)
 
 ## 남은 작업
 
 - 토양 데이터가 "전국 평균값"으로 나오면 그 지역에 실측/통계 데이터가 모두 없다는 뜻 — 사용자에게 안내 필요
-- 미생물 논문 RAG 검색 + LLM 설명 생성 단계 미구현
-- a-1/b/b-1 화면은 아직 임시(가짜) 데이터로만 동작
+- b/b-1(살포 시기) 화면은 아직 임시(가짜) 데이터로만 동작
