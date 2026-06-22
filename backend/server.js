@@ -4,6 +4,8 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const { Readable } = require("stream");
+const { pipeline } = require("stream/promises");
 const express = require("express");
 const cors = require("cors");
 const proj4 = require("proj4");
@@ -34,9 +36,11 @@ app.get("/health", (req, res) => {
 /**
  * [5] 논문 RAG 검색 (Voyage AI 임베딩 + 코사인 유사도)
  * A등급 논문 1,764편을 49,003개 청크로 나눠 미리 임베딩해둔 인덱스를 GitHub
- * Release에서 받아와 메모리에 올리고, 사용자 질의와 가장 가까운 청크를 찾습니다.
- * 메모리를 아끼기 위해 청크 본문은 파싱하지 않고 원본 버퍼 + 줄 위치만 들고 있다가,
- * 검색 결과 상위 몇 개에 대해서만 그때그때 파싱합니다.
+ * Release에서 받아와 사용자 질의와 가장 가까운 청크를 찾습니다.
+ * 메모리가 적은 Render 인스턴스에서도 돌 수 있도록, 청크 본문(167MB)은 메모리에
+ * 올리지 않고 파일 디스크립터 + 줄 위치만 들고 있다가 검색 결과 상위 몇 개만
+ * 그때그때 파일에서 읽어 파싱합니다. 벡터(200MB)는 코사인 유사도를 전체 스캔해야
+ * 해서 어쩔 수 없이 메모리에 올립니다.
  */
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY;
 const PAPER_INDEX_BASE_URL =
@@ -47,31 +51,44 @@ const CHUNKS_PATH = path.join(DATA_DIR, "chunks.jsonl");
 const VECTOR_DIM = 1024;
 
 let paperVectors = null; // Float32Array, n개 x VECTOR_DIM
-let chunksBuffer = null; // chunks.jsonl 원본 바이트
-let chunkOffsets = null; // [start, end] 배열 (줄 단위, chunksBuffer 기준)
+let chunksFd = null; // chunks.jsonl 파일 디스크립터 (랜덤 읽기용, 끝까지 열어둠)
+let chunkOffsets = null; // [start, end] 배열 (줄 단위, chunks.jsonl 파일 기준 바이트 오프셋)
 
 async function downloadIfMissing(url, destPath) {
     if (fs.existsSync(destPath)) return;
     console.log(`⬇️  논문 인덱스 다운로드 중: ${path.basename(destPath)}`);
     const response = await fetch(url);
     if (!response.ok) throw new Error(`다운로드 실패 (${response.status}): ${url}`);
-    const buf = Buffer.from(await response.arrayBuffer());
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.writeFileSync(destPath, buf);
-    console.log(`✅ 다운로드 완료: ${path.basename(destPath)} (${(buf.length / 1e6).toFixed(1)}MB)`);
+    // 전체 응답을 메모리에 버퍼링하지 않고 디스크로 바로 스트리밍 (메모리 절약)
+    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(destPath));
+    console.log(`✅ 다운로드 완료: ${path.basename(destPath)}`);
 }
 
-function buildLineOffsets(buf) {
-    const offsets = [];
-    let start = 0;
-    for (let i = 0; i < buf.length; i++) {
-        if (buf[i] === 0x0a) {
-            if (i > start) offsets.push([start, i]);
-            start = i + 1;
+// chunks.jsonl 전체를 메모리에 올리지 않고 일정 크기씩 읽으며 줄 경계(바이트 오프셋)만 기록
+function buildLineOffsetsFromFile(filePath) {
+    const fd = fs.openSync(filePath, "r");
+    try {
+        const offsets = [];
+        const readBuf = Buffer.alloc(1024 * 1024);
+        let filePos = 0;
+        let lineStart = 0;
+        let bytesRead;
+        while ((bytesRead = fs.readSync(fd, readBuf, 0, readBuf.length, filePos)) > 0) {
+            for (let i = 0; i < bytesRead; i++) {
+                if (readBuf[i] === 0x0a) {
+                    const newlinePos = filePos + i;
+                    if (newlinePos > lineStart) offsets.push([lineStart, newlinePos]);
+                    lineStart = newlinePos + 1;
+                }
+            }
+            filePos += bytesRead;
         }
+        if (lineStart < filePos) offsets.push([lineStart, filePos]);
+        return offsets;
+    } finally {
+        fs.closeSync(fd);
     }
-    if (start < buf.length) offsets.push([start, buf.length]);
-    return offsets;
 }
 
 async function loadPaperIndex() {
@@ -82,8 +99,8 @@ async function loadPaperIndex() {
         const vecBuf = fs.readFileSync(VECTORS_PATH);
         paperVectors = new Float32Array(vecBuf.buffer, vecBuf.byteOffset, vecBuf.length / 4);
 
-        chunksBuffer = fs.readFileSync(CHUNKS_PATH);
-        chunkOffsets = buildLineOffsets(chunksBuffer);
+        chunkOffsets = buildLineOffsetsFromFile(CHUNKS_PATH);
+        chunksFd = fs.openSync(CHUNKS_PATH, "r");
 
         console.log(`📚 논문 인덱스 로드 완료: ${chunkOffsets.length}개 청크`);
     } catch (error) {
@@ -93,7 +110,9 @@ async function loadPaperIndex() {
 
 function getChunk(idx) {
     const [start, end] = chunkOffsets[idx];
-    return JSON.parse(chunksBuffer.toString("utf-8", start, end));
+    const buf = Buffer.alloc(end - start);
+    fs.readSync(chunksFd, buf, 0, buf.length, start);
+    return JSON.parse(buf.toString("utf-8"));
 }
 
 async function embedQuery(text) {
