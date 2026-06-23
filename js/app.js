@@ -190,6 +190,8 @@ async function renderRecommendResult() {
             `;
         }).join("");
 
+        // 논문 인용이 들어간 학술적 설명("더보기")과 참고 논문 목록은 기본으로는 숨겨두고,
+        // 화면에는 농경지 특성·미생물 효능을 쉬운 말로 풀어준 explanation만 바로 보여줌
         const sourcesList = data.sources.map((s) =>
             `<li>${s.title} <span class="value">(${s.journal}, ${s.year})</span></li>`
         ).join("");
@@ -198,10 +200,14 @@ async function renderRecommendResult() {
             ${cards}
             <p class="result-card__effect">${data.explanation}</p>
             ${data.quotaExceeded ? `<p class="notice">⚠️ AI 무료 사용량 한도에 도달해 추천 균종 목록은 비어 있습니다. 잠시 후 다시 시도해주세요.</p>` : ""}
-            <details class="notice">
-                <summary>참고 논문 ${data.sources.length}건 보기</summary>
-                <ul>${sourcesList}</ul>
-            </details>
+            ${data.scientificEvidence ? `
+                <details class="notice">
+                    <summary>📄 더보기: 논문 근거로 살펴보기</summary>
+                    <p style="margin-top: 10px;">${data.scientificEvidence}</p>
+                    <p class="label" style="margin: 14px 0 8px;">참고 논문 ${data.sources.length}건</p>
+                    <ul>${sourcesList}</ul>
+                </details>
+            ` : ""}
         `;
     } catch (error) {
         console.error(error);

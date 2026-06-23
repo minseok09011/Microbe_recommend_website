@@ -480,20 +480,44 @@ app.get("/api/searchPapers", async (req, res) => {
  * [8] 미생물 추천 (RAG + LLM)
  * 1) 토양/기상 데이터를 영어 질의 문장으로 변환
  * 2) 논문 인덱스에서 관련 청크 검색
- * 3) Gemini에게 검색된 논문 근거 + 환경 데이터를 주고 추천 미생물(학명)과 이유를 한국어로 생성하게 함
+ * 3) Gemini에게 검색된 논문 근거 + 환경 데이터를 주고 추천 미생물(학명)을 정하게 한 뒤,
+ *    농민이 바로 이해할 수 있는 쉬운 설명(explanation)과 논문 인용이 포함된 학술적
+ *    근거(scientificEvidence)를 분리해서 생성하게 함 — 화면에서는 쉬운 설명을 기본으로
+ *    보여주고, 논문 근거는 "더보기"에 접어서 보여줌
  * 4) 추천된 학명을 microbe_disclosure.csv(공시현황 원본)와 매칭해서 실제 판매처 정보를 붙임
  */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
+const FIELD_LABELS_KO = {
+    soilPh: "토양 산도(pH)",
+    soilOrganic: "유기물 함량(g/kg)",
+    soilPhosphate: "유효인산(mg/kg)",
+    soilPotassium: "칼륨(cmol+/kg)",
+    soilCalcium: "칼슘(cmol+/kg)",
+    soilMagnesium: "마그네슘(cmol+/kg)",
+    soilMoisture: "토양 수분(%)",
+    airTemp: "기온(°C)",
+    rain: "최근 강수량(mm)",
+};
+
+function buildFarmStatsKorean(data) {
+    return Object.entries(FIELD_LABELS_KO)
+        .filter(([key]) => data[key] !== undefined && !Number.isNaN(data[key]))
+        .map(([key, label]) => `${label}: ${data[key]}`)
+        .join(", ");
+}
+
 async function generateRecommendation(crop, data, queryText, sourceChunks) {
     const sourcesText = sourceChunks
         .map((c, i) => `[${i + 1}] ${c.title} (${c.journal}, ${c.year})\n${c.text.slice(0, 800)}`)
         .join("\n\n");
+    const farmStatsKorean = buildFarmStatsKorean(data);
 
     const prompt = `당신은 농업 미생물 전문가입니다. 아래 농경지 환경 데이터와 관련 논문 발췌문을 보고, 이 농경지에 가장 적합한 미생물을 추천해주세요.
 
 [작물] ${crop}
+[농경지 수치] ${farmStatsKorean}
 [환경 데이터 요약] ${queryText}
 
 [관련 논문 발췌]
@@ -502,7 +526,8 @@ ${sourcesText}
 다음 JSON 형식으로만 답변하세요 (다른 텍스트 없이):
 {
   "recommendedSpecies": ["학명1", "학명2"],
-  "explanation": "왜 이 미생물(들)을 추천하는지, 위 논문 근거를 인용([1], [2] 등)하며 한국어로 설명. 3~5문장."
+  "explanation": "전문 용어와 논문 인용 없이, 농사 짓는 분이 바로 이해할 수 있는 쉽고 친근한 말투의 한국어로 작성. (1) 이 농경지의 토양 상태(산도, 유기물, 영양분 등)가 작물 재배에 어떤 의미인지 일상적인 표현으로 설명하고, (2) 추천한 미생물이 구체적으로 어떤 효능이 있어서 이 토양과 작물에 도움이 되는지 설명. 4~6문장.",
+  "scientificEvidence": "위 추천의 과학적 근거를 위 논문 발췌를 인용([1], [2] 등)하며 전문적으로 설명. 3~5문장."
 }`;
 
     const response = await fetch(
@@ -563,20 +588,20 @@ app.get("/api/recommendMicrobe", async (req, res) => {
     const sources = sourceChunks.map((c) => ({ title: c.title, journal: c.journal, year: c.year, doi: c.doi }));
 
     try {
-        const { recommendedSpecies, explanation } = await generateRecommendation(crop, data, queryText, sourceChunks);
+        const { recommendedSpecies, explanation, scientificEvidence } = await generateRecommendation(crop, data, queryText, sourceChunks);
         const microbes = recommendedSpecies.map((species) => ({
             species,
             vendorInfo: findMicrobeVendorInfo(species),
         }));
 
-        res.json({ queryText, explanation, microbes, sources });
+        res.json({ queryText, explanation, scientificEvidence, microbes, sources });
     } catch (error) {
         console.error("❌ 미생물 추천(LLM) 에러:", error.message);
         if (error.quotaExceeded) {
             // 무료 API 사용량 한도 초과: 에러로 막지 않고 검색된 논문만 보여줌
             return res.json({
                 queryText,
-                explanation: "현재 무료 API 사용량 한도에 도달하여 AI 추천 설명을 생성할 수 없습니다. 아래 관련 논문을 참고하시거나 잠시 후 다시 시도해주세요.",
+                explanation: "현재 무료 API 사용량 한도에 도달하여 AI 추천 설명을 생성할 수 없습니다. 잠시 후 다시 시도해주세요.",
                 microbes: [],
                 sources,
                 quotaExceeded: true,
