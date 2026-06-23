@@ -52,7 +52,10 @@ const VECTOR_DIM = 1024;
 
 let paperVectors = null; // Float32Array, n개 x VECTOR_DIM
 let chunksFd = null; // chunks.jsonl 파일 디스크립터 (랜덤 읽기용, 끝까지 열어둠)
-let chunkOffsets = null; // [start, end] 배열 (줄 단위, chunks.jsonl 파일 기준 바이트 오프셋)
+// 청크별 [시작, 끝] 바이트 오프셋. {idx,score} 객체 배열 대신 Int32Array 두 개로 들고 있어
+// 49,003개 기준 객체 배열(~4MB)보다 메모리를 적게 씀(~400KB) — Render 메모리 한도 대응
+let chunkStarts = null;
+let chunkEnds = null;
 
 async function downloadIfMissing(url, destPath) {
     if (fs.existsSync(destPath)) return;
@@ -69,7 +72,8 @@ async function downloadIfMissing(url, destPath) {
 function buildLineOffsetsFromFile(filePath) {
     const fd = fs.openSync(filePath, "r");
     try {
-        const offsets = [];
+        const starts = [];
+        const ends = [];
         const readBuf = Buffer.alloc(1024 * 1024);
         let filePos = 0;
         let lineStart = 0;
@@ -78,14 +82,20 @@ function buildLineOffsetsFromFile(filePath) {
             for (let i = 0; i < bytesRead; i++) {
                 if (readBuf[i] === 0x0a) {
                     const newlinePos = filePos + i;
-                    if (newlinePos > lineStart) offsets.push([lineStart, newlinePos]);
+                    if (newlinePos > lineStart) {
+                        starts.push(lineStart);
+                        ends.push(newlinePos);
+                    }
                     lineStart = newlinePos + 1;
                 }
             }
             filePos += bytesRead;
         }
-        if (lineStart < filePos) offsets.push([lineStart, filePos]);
-        return offsets;
+        if (lineStart < filePos) {
+            starts.push(lineStart);
+            ends.push(filePos);
+        }
+        return { starts: Int32Array.from(starts), ends: Int32Array.from(ends) };
     } finally {
         fs.closeSync(fd);
     }
@@ -99,17 +109,20 @@ async function loadPaperIndex() {
         const vecBuf = fs.readFileSync(VECTORS_PATH);
         paperVectors = new Float32Array(vecBuf.buffer, vecBuf.byteOffset, vecBuf.length / 4);
 
-        chunkOffsets = buildLineOffsetsFromFile(CHUNKS_PATH);
+        const offsets = buildLineOffsetsFromFile(CHUNKS_PATH);
+        chunkStarts = offsets.starts;
+        chunkEnds = offsets.ends;
         chunksFd = fs.openSync(CHUNKS_PATH, "r");
 
-        console.log(`📚 논문 인덱스 로드 완료: ${chunkOffsets.length}개 청크`);
+        console.log(`📚 논문 인덱스 로드 완료: ${chunkStarts.length}개 청크`);
     } catch (error) {
         console.error("❌ 논문 인덱스 로드 실패:", error.message);
     }
 }
 
 function getChunk(idx) {
-    const [start, end] = chunkOffsets[idx];
+    const start = chunkStarts[idx];
+    const end = chunkEnds[idx];
     const buf = Buffer.alloc(end - start);
     fs.readSync(chunksFd, buf, 0, buf.length, start);
     return JSON.parse(buf.toString("utf-8"));
@@ -140,50 +153,241 @@ function cosineSimilarity(query, vectorOffset) {
     return dot / (Math.sqrt(queryNorm) * Math.sqrt(vectorNorm));
 }
 
+// 49,003개 전체를 {idx,score} 객체 배열로 만들어 정렬하면 요청마다 수 MB가 잠깐
+// 할당되는데, 어차피 상위 k개(8개)만 필요하므로 크기 k짜리 배열만 유지하며 삽입
+// 정렬하는 방식으로 바꿔 요청당 추가 메모리를 O(n) → O(k)로 줄임
 function searchTopChunks(queryVector, topK) {
-    const n = chunkOffsets.length;
-    const scored = new Array(n);
+    const n = chunkStarts.length;
+    const k = Math.min(topK, n);
+    const topScores = new Array(k).fill(-Infinity);
+    const topIdx = new Array(k).fill(-1);
+
     for (let i = 0; i < n; i++) {
-        scored[i] = { idx: i, score: cosineSimilarity(queryVector, i * VECTOR_DIM) };
+        const score = cosineSimilarity(queryVector, i * VECTOR_DIM);
+        if (score <= topScores[k - 1]) continue;
+        let pos = k - 1;
+        while (pos > 0 && topScores[pos - 1] < score) {
+            topScores[pos] = topScores[pos - 1];
+            topIdx[pos] = topIdx[pos - 1];
+            pos--;
+        }
+        topScores[pos] = score;
+        topIdx[pos] = i;
     }
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, topK).map(({ idx, score }) => ({ ...getChunk(idx), score }));
+
+    return topIdx.map((idx, i) => ({ ...getChunk(idx), score: topScores[i] }));
 }
 
 /**
- * [6] 미생물 판매처 정보 (microbe_master.csv)
- * 종(species)별 등록 제품 수, 가격대, 판매업체, 식약처 등록 여부, 용도 카테고리를 담고 있습니다.
- * 추천된 미생물 종명과 매칭해서 "어디서 살 수 있는지"를 함께 보여주는 데 사용합니다.
+ * [6] 실제 미생물자재 공시현황 기반 판매처 정보 (microbe_disclosure.csv)
+ * 농림축산식품부 공시현황 원본(공시번호·상표명·사업자·가격·연락처·제조장주소 등)을 그대로
+ * 가공한 자료입니다. 추천된 미생물 학명과 매칭해서 실제로 어느 회사에서 어떤 제품으로
+ * 살 수 있는지를 함께 보여줍니다.
+ *
+ * 학명 표기가 갈리는 문제 대응:
+ * - 같은 셀에 여러 종이 "A, B" 형태로 같이 적힌 경우 종별로 분리해서 색인
+ * - 흔한 오타("subtillis" 등)는 별도 표로 교정
+ * - 최근 분류 변경으로 속명이 달라진 경우(예: Lactobacillus → Lactiplantibacillus,
+ *   Bacillus megaterium → Priestia megaterium 등 논문에서 흔히 쓰는 신학명)를
+ *   동의어 표로 표준 학명에 매핑
+ * - 위 두 표에 없는 표기 차이는, 속명이 달라도 종명(epithet)이 데이터 내에서 유일하게
+ *   일치하면 보조적으로 매칭(matchType: "epithet")해 표기 차이로 못 찾는 경우를 줄임
+ * - LLM이 "Bacillus spp."처럼 종까지는 특정하지 않고 속(genus) 단위로만 추천하거나,
+ *   특정 종이 공시현황에 아예 없는 경우에는 같은 속(genus)의 다른 등록 제품들을
+ *   모아서 보여줌(matchType: "genus")
  */
-const MICROBE_MASTER_PATH = path.join(__dirname, "microbe_master.csv");
-let microbeMasterByName = new Map();
+const MICROBE_DISCLOSURE_PATH = path.join(__dirname, "microbe_disclosure.csv");
+let disclosureByKey = new Map(); // "genus species" -> { displayName, vendors: [...] }
+let disclosureEpithetIndex = new Map(); // species epithet -> Set("genus species")
+let disclosureGenusIndex = new Map(); // genus -> Set("genus species")
 
-function loadMicrobeMaster() {
-    let csvText = fs.readFileSync(MICROBE_MASTER_PATH, "utf-8");
+const SPECIES_TYPO_FIX = {
+    "bacillus subtillis": "bacillus subtilis",
+    "bacillus velenzensis": "bacillus velezensis",
+    "bacillus thrungiensis": "bacillus thuringiensis",
+};
+
+// 재분류로 속명이 바뀌어 논문/AI가 신학명을 쓰는 경우 -> 공시현황이 쓰는 옛 학명으로 표준화
+// (A등급 논문 코퍼스 49,003개 청크를 실제로 스캔해서 자주 등장하는 학명을 확인하고,
+//  공시현황의 39개 종과 같은 미생물인데 표기만 다른 경우를 추려 반영함)
+const SPECIES_SYNONYMS = {
+    "priestia megaterium": "bacillus megaterium",
+    "priestia altitudinis": "bacillus altitudinis",
+    "priestia aryabhattai": "bacillus aryabhattai",
+    "lactiplantibacillus plantarum": "lactobacillus plantarum",
+    "lacticaseibacillus casei": "lactobacillus casei",
+    "lacticaseibacillus paracasei": "lactobacillus paracasei",
+    "lacticaseibacillus rhamnosus": "lactobacillus rhamnosus",
+    "limosilactobacillus fermentum": "lactobacillus fermentum",
+    "latilactobacillus sakei": "lactobacillus sakei",
+    "bacillus polymyxa": "paenibacillus polymyxa", // 1993년 Paenibacillus 속이 분리되기 전 옛 이름
+};
+
+// 2020년 Bacillus·Lactobacillus 속이 여러 속으로 대거 재분류되면서(예: Bacillus →
+// Priestia/Peribacillus/Niallia 등, Lactobacillus → Lactiplantibacillus/
+// Lacticaseibacillus 등) 생긴 신생 속들. 위 SPECIES_SYNONYMS에 없는 종(예:
+// "Peribacillus simplex", "Limosilactobacillus reuteri")이 추천되더라도, 적어도
+// 같은 옛 속(genus) 단위 판매처로는 보조 매칭되도록 속명 자체를 별칭 처리
+const GENUS_ALIASES = {
+    priestia: "bacillus",
+    peribacillus: "bacillus",
+    cytobacillus: "bacillus",
+    mesobacillus: "bacillus",
+    neobacillus: "bacillus",
+    metabacillus: "bacillus",
+    alkalihalobacillus: "bacillus",
+    niallia: "bacillus",
+    heyndrickxia: "bacillus",
+    weizmannia: "bacillus",
+    lactiplantibacillus: "lactobacillus",
+    lacticaseibacillus: "lactobacillus",
+    limosilactobacillus: "lactobacillus",
+    latilactobacillus: "lactobacillus",
+    levilactobacillus: "lactobacillus",
+    ligilactobacillus: "lactobacillus",
+    furfurilactobacillus: "lactobacillus",
+    secundilactobacillus: "lactobacillus",
+    schleiferilactobacillus: "lactobacillus",
+    paucilactobacillus: "lactobacillus",
+    companilactobacillus: "lactobacillus",
+};
+
+// "Bacillus subtilis subsp. subtilis KCTC 1021" 같은 표기에서 균주/하위분류 표기를 떼어내고
+// 속명+종명 두 단어만 남긴 표준 키("bacillus subtilis")로 정규화
+function canonicalSpeciesKey(rawName) {
+    let name = (rawName || "").trim().toLowerCase();
+    name = name.replace(/\([^)]*\)/g, " ");
+    name = name.replace(/\b(subsp|var|serovar|sv|pv|str|strain)\.?\s+.*$/i, "");
+    name = name.replace(/[^a-z.\s]/g, " ");
+    const tokens = name.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return null;
+
+    let species = tokens[1] || "sp.";
+    if (species === "spp." || species === "spp" || species === "sp") species = "sp.";
+
+    let key = `${tokens[0]} ${species}`;
+    key = SPECIES_TYPO_FIX[key] || key;
+    key = SPECIES_SYNONYMS[key] || key;
+    return key;
+}
+
+function toDisplayName(key) {
+    return key.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function parsePriceWon(priceText) {
+    if (!priceText) return null;
+    if (priceText.includes("무상")) return 0;
+    const match = priceText.replace(/,/g, "").match(/(\d+)\s*원/);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+const UNREGISTERED_LABELS = new Set(["X", "-", "없음", ""]);
+
+function loadMicrobeDisclosure() {
+    let csvText = fs.readFileSync(MICROBE_DISCLOSURE_PATH, "utf-8");
     if (csvText.charCodeAt(0) === 0xfeff) csvText = csvText.slice(1);
     const rows = parseCsv(csvText, { columns: true, skip_empty_lines: true, relax_column_count: true });
 
     for (const row of rows) {
-        const species = (row.species || "").trim();
-        if (!species) continue;
-        microbeMasterByName.set(species.toLowerCase(), {
-            species,
-            genus: row.genus || "",
-            type: row.type || "",
-            productCount: parseInt(row.product_count, 10) || 0,
-            priceMin: parseInt(row.price_min, 10) || null,
-            priceMax: parseInt(row.price_max, 10) || null,
-            vendors: (row.vendors || "").split(";").map((v) => v.trim()).filter(Boolean),
-            mfdsRegistered: row.mfds_registered === "TRUE",
-            mfdsBrands: (row.mfds_brands || "").split(";").map((v) => v.trim()).filter(Boolean),
-            categories: (row.categories || "").split(";").map((v) => v.trim()).filter(Boolean),
-        });
+        const rawSpeciesField = (row["미생물 학명"] || "").trim();
+        if (!rawSpeciesField) continue;
+
+        const registeredLabel = (row["농약/비료등록여부"] || "").trim();
+        const vendor = {
+            product: (row["상표명(자재명)"] || "").trim(),
+            company: (row["사업자"] || "").trim(),
+            price: (row["가격"] || "").trim(),
+            priceWon: parsePriceWon(row["가격"]),
+            contact: (row["연락처(사업장)"] || "").trim(),
+            address: (row["제조장주소"] || "").trim(),
+            registrar: (row["공시기관"] || "").trim(),
+            validPeriod: (row["유효기간"] || "").trim(),
+            registered: !UNREGISTERED_LABELS.has(registeredLabel),
+        };
+
+        for (const speciesPart of rawSpeciesField.split(",")) {
+            const key = canonicalSpeciesKey(speciesPart);
+            if (!key) continue;
+
+            if (!disclosureByKey.has(key)) {
+                disclosureByKey.set(key, { displayName: toDisplayName(key), vendors: [] });
+            }
+            disclosureByKey.get(key).vendors.push(vendor);
+
+            const [genus, epithet] = key.split(" ");
+            if (epithet && epithet !== "sp.") {
+                if (!disclosureEpithetIndex.has(epithet)) disclosureEpithetIndex.set(epithet, new Set());
+                disclosureEpithetIndex.get(epithet).add(key);
+            }
+            if (!disclosureGenusIndex.has(genus)) disclosureGenusIndex.set(genus, new Set());
+            disclosureGenusIndex.get(genus).add(key);
+        }
     }
-    console.log(`🧫 미생물 판매처 정보 로드 완료: ${microbeMasterByName.size}종`);
+    console.log(`🏪 미생물 공시현황 판매처 정보 로드 완료: ${disclosureByKey.size}종 / 원본 ${rows.length}건`);
 }
 
 function findMicrobeVendorInfo(speciesName) {
-    return microbeMasterByName.get((speciesName || "").trim().toLowerCase()) || null;
+    let key = canonicalSpeciesKey(speciesName);
+    let entry = key ? disclosureByKey.get(key) : null;
+    let matchType = "exact";
+
+    if (!entry && key) {
+        // 오타/동의어 표에 없는 표기 차이: 속명이 달라도 종명이 데이터 내에서 유일하면 매칭
+        const epithet = key.split(" ")[1];
+        const candidates = epithet && epithet !== "sp." && disclosureEpithetIndex.get(epithet);
+        if (candidates && candidates.size === 1) {
+            key = [...candidates][0];
+            entry = disclosureByKey.get(key);
+            matchType = "epithet";
+        }
+    }
+    if (!entry && key) {
+        // "Bacillus spp."처럼 종까지 특정하지 않거나, 특정 종이 공시현황에 없는 경우:
+        // 같은 속(genus)에 등록된 다른 제품들을 모두 모아서 보여줌
+        // (genus 자체가 재분류로 바뀐 신생 속이면 GENUS_ALIASES로 옛 속명을 찾아봄)
+        let genus = key.split(" ")[0];
+        let genusKeys = disclosureGenusIndex.get(genus);
+        if (!genusKeys && GENUS_ALIASES[genus]) {
+            genus = GENUS_ALIASES[genus];
+            genusKeys = disclosureGenusIndex.get(genus);
+        }
+        if (genusKeys && genusKeys.size > 0) {
+            const mergedVendors = [];
+            for (const gk of genusKeys) mergedVendors.push(...disclosureByKey.get(gk).vendors);
+            entry = { displayName: `${toDisplayName(genus)} spp.`, vendors: mergedVendors };
+            matchType = "genus";
+        }
+    }
+    if (!entry) return null;
+
+    // 같은 회사가 제품 여러 개를 등록한 경우 회사 단위로 묶어서 보여줌
+    const byCompany = new Map();
+    for (const v of entry.vendors) {
+        if (!v.company) continue;
+        if (!byCompany.has(v.company)) byCompany.set(v.company, { company: v.company, products: [] });
+        byCompany.get(v.company).products.push({
+            product: v.product,
+            price: v.price,
+            contact: v.contact,
+            address: v.address,
+            registrar: v.registrar,
+            validPeriod: v.validPeriod,
+            registered: v.registered,
+        });
+    }
+
+    const priceValues = entry.vendors.map((v) => v.priceWon).filter((p) => p !== null && p > 0);
+
+    return {
+        matchedName: entry.displayName,
+        matchType, // "exact" | "epithet"(종명만으로 매칭) | "genus"(같은 속의 다른 제품들로 매칭)
+        productCount: entry.vendors.length,
+        priceMin: priceValues.length ? Math.min(...priceValues) : null,
+        priceMax: priceValues.length ? Math.max(...priceValues) : null,
+        registered: entry.vendors.some((v) => v.registered),
+        vendors: [...byCompany.values()],
+    };
 }
 
 /**
@@ -277,7 +481,7 @@ app.get("/api/searchPapers", async (req, res) => {
  * 1) 토양/기상 데이터를 영어 질의 문장으로 변환
  * 2) 논문 인덱스에서 관련 청크 검색
  * 3) Gemini에게 검색된 논문 근거 + 환경 데이터를 주고 추천 미생물(학명)과 이유를 한국어로 생성하게 함
- * 4) 추천된 학명을 microbe_master.csv와 매칭해서 판매처 정보를 붙임
+ * 4) 추천된 학명을 microbe_disclosure.csv(공시현황 원본)와 매칭해서 실제 판매처 정보를 붙임
  */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
@@ -606,5 +810,5 @@ app.get("/api/getMergedData", async (req, res) => {
 app.listen(PORT, () => {
     console.log(`✅ 백엔드 서버 실행 중: http://localhost:${PORT}`);
     loadPaperIndex();
-    loadMicrobeMaster();
+    loadMicrobeDisclosure();
 });

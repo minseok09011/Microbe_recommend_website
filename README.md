@@ -39,14 +39,19 @@
       관련 청크 8개를 검색
   11. Gemini(gemini-3.1-flash-lite, 무료 티어)에게 검색된 논문 발췌 + 환경
       데이터를 주고, 추천 미생물 학명과 한국어 근거 설명을 생성하게 함
-  12. 추천된 학명을 backend/microbe_master.csv(국내 등록 미생물 제품
-      판매처/가격/식약처 등록 여부)와 매칭
+  12. 추천된 학명을 backend/microbe_disclosure.csv(농림축산식품부 미생물
+      자재 공시현황 원본: 상표명·사업자·가격·연락처·제조장주소)와 매칭해
+      실제 구매 가능한 판매처 목록을 붙임. 학명 표기가 갈리는 경우(흔한
+      오타, "A, B" 복수 표기, 균주 표기, Lactobacillus→Lactiplantibacillus·
+      Bacillus megaterium→Priestia megaterium 같은 재분류 신학명, "Bacillus
+      spp."처럼 속(genus) 단위로만 추천되는 경우 등)에도 매칭되도록 정규화 +
+      오타/동의어 표 + 종명(epithet) 단독 매칭 + 같은 속 제품 통합 매칭을 단계적으로 적용
   13. 무료 API 사용량 한도 초과(HTTP 429) 시에는 에러 대신 검색된 논문
       목록만 보여주고 quotaExceeded: true 플래그를 응답에 포함
         ↓
 [브라우저: a-1_recommend-result.html]
-  14. 추천 미생물 카드(가격대/제품 수/식약처 등록 여부) + AI 설명 +
-      참고 논문 목록을 렌더링
+  14. 추천 미생물 카드(가격대/제품 수/농약·비료 등록 여부/실제 판매처
+      목록: 회사명·제품명·가격·연락처) + AI 설명 + 참고 논문 목록을 렌더링
 ```
 
 ## 주소 처리
@@ -64,7 +69,11 @@
 ## 미생물 추천(RAG + LLM) 인덱스
 
 - 논문 청크/벡터 인덱스(`chunks.jsonl` 167MB, `vectors.f32` 200MB)는 GitHub Release(`paper-index-a-grade-v1`)에 올려두고, 백엔드가 처음 뜰 때 다운로드합니다 (`backend/data/`는 git에 커밋하지 않음).
-- 메모리가 적은 인스턴스에서도 돌도록, 청크 본문은 메모리에 전부 올리지 않고 파일에서 필요한 부분만 그때그때 읽습니다. 벡터는 코사인 유사도 전체 스캔이 필요해 메모리에 올립니다.
+- 메모리가 적은 Render 무료 인스턴스(512MB 한도)에서도 돌도록 메모리를 최소화했습니다:
+  - 청크 본문(167MB)은 메모리에 전부 올리지 않고, 줄 단위 바이트 오프셋(Int32Array 2개)만 들고 있다가 검색 결과 상위 몇 개만 파일에서 그때그때 읽음
+  - 벡터(200MB, Float32Array)는 코사인 유사도 전체 스캔이 필요해 메모리에 올리되, 1개만 할당하고 추가 복사는 만들지 않음
+  - 검색 시 청크 49,003개 전체를 `{idx,score}` 객체 배열로 만들어 정렬하지 않고, 필요한 상위 k개(8개)만 유지하는 삽입 방식으로 요청당 추가 메모리를 사실상 0에 가깝게 줄임
+  - 실측 기준 구동 시 RSS 약 240~260MB (한도 512MB 대비 여유 있음)
 - 인덱스를 처음부터 다시 만들 때는 `backend/scripts/buildPaperIndex.js`로 청크 분할 + Voyage 임베딩을 실행합니다.
 
 ## 폴더 구조
@@ -83,7 +92,7 @@
 │   └── agriStations.js       # 자동 생성된 농업기상 관측지점 좌표 목록
 └── backend/                  # Render에 배포되는 Express 서버
     ├── server.js
-    ├── microbe_master.csv    # 미생물 종별 판매처/가격/식약처 등록 정보
+    ├── microbe_disclosure.csv  # 미생물자재 공시현황 원본(실제 판매처/가격/연락처)
     ├── package.json
     ├── render.yaml
     ├── .env.example

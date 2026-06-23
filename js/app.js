@@ -151,23 +151,40 @@ async function renderRecommendResult() {
 
         const cards = data.microbes.map((m) => {
             const v = m.vendorInfo;
+            const vendorList = v ? v.vendors.slice(0, 6).map((vendor) => {
+                const firstProduct = vendor.products[0];
+                return `
+                    <li class="vendor-item">
+                        <span class="vendor-item__company">${vendor.company}</span>
+                        <span class="vendor-item__product">${firstProduct.product}${vendor.products.length > 1 ? ` 외 ${vendor.products.length - 1}개` : ""}</span>
+                        ${firstProduct.price ? `<span class="vendor-item__price">${firstProduct.price}</span>` : ""}
+                        ${firstProduct.contact ? `<span class="vendor-item__contact">📞 ${firstProduct.contact}</span>` : ""}
+                    </li>
+                `;
+            }).join("") : "";
+
             return `
                 <div class="result-card">
                     <span class="result-card__badge">👍 추천 미생물</span>
                     <h2 class="result-card__name">${m.species}</h2>
                     ${v ? `
+                        ${v.matchType === "epithet" ? `<p class="result-card__sci">⚠️ "${m.species}"와 표기가 달라 같은 균종으로 보이는 "${v.matchedName}" 판매처를 보여줍니다.</p>` : ""}
+                        ${v.matchType === "genus" ? `<p class="result-card__sci">⚠️ "${m.species}"와 정확히 일치하는 제품은 없어, 같은 속(genus)인 "${v.matchedName}" 계열 판매처를 모아 보여줍니다.</p>` : ""}
                         <div class="result-card__row">
                             <span class="label">가격대</span>
-                            <span class="value">${v.priceMin ? v.priceMin.toLocaleString() + "원 ~ " + v.priceMax.toLocaleString() + "원" : "정보 없음"}</span>
+                            <span class="value">${v.priceMin !== null ? v.priceMin.toLocaleString() + "원 ~ " + v.priceMax.toLocaleString() + "원" : "정보 없음"}</span>
                         </div>
                         <div class="result-card__row">
                             <span class="label">등록 제품 수</span>
                             <span class="value">${v.productCount}개</span>
                         </div>
                         <div class="result-card__row">
-                            <span class="label">식약처 등록</span>
-                            <span class="value">${v.mfdsRegistered ? "등록됨" : "미등록"}</span>
+                            <span class="label">농약/비료 등록</span>
+                            <span class="value">${v.registered ? "등록됨" : "미등록"}</span>
                         </div>
+                        <p class="label" style="margin: 14px 0 8px;">구매 가능한 판매처 (${v.vendors.length}곳)</p>
+                        <ul class="vendor-list">${vendorList}</ul>
+                        ${v.vendors.length > 6 ? `<p class="result-card__sci">외 ${v.vendors.length - 6}곳 더 있음</p>` : ""}
                     ` : `<p class="result-card__effect">판매처 정보가 아직 등록되지 않은 균종입니다.</p>`}
                 </div>
             `;
