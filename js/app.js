@@ -169,6 +169,7 @@ async function renderRecommendResult() {
                         <span class="vendor-item__product">${firstProduct.product}${vendor.products.length > 1 ? ` 외 ${vendor.products.length - 1}개` : ""}</span>
                         ${firstProduct.price ? `<span class="vendor-item__price">${firstProduct.price}</span>` : ""}
                         ${firstProduct.contact ? `<span class="vendor-item__contact">📞 ${firstProduct.contact}</span>` : ""}
+                        ${firstProduct.onlineUrl ? `<a class="vendor-item__buy" href="${firstProduct.onlineUrl}" target="_blank" rel="noopener noreferrer">🛒 온라인 구매</a>` : ""}
                     </li>
                 `;
             }).join("") : "";
