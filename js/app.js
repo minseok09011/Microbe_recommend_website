@@ -193,7 +193,7 @@ async function renderRecommendResult() {
                             <span class="label">농약/비료 등록</span>
                             <span class="value">${v.registered ? "등록됨" : "미등록"}</span>
                         </div>
-                        <p class="label" style="margin: 14px 0 8px;">구매 가능한 판매처 (${v.vendors.length}곳)</p>
+                        <p class="label" style="margin: 14px 0 8px;">구매 가능 판매처  (${v.vendors.length}곳)</p>
                         <ul class="vendor-list">${vendorList}</ul>
                         ${v.vendors.length > 6 ? `<p class="result-card__sci">외 ${v.vendors.length - 6}곳 더 있음</p>` : ""}
                     ` : `<p class="result-card__effect">판매처 정보가 아직 등록되지 않은 균종입니다.</p>`}
