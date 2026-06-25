@@ -312,9 +312,11 @@ function loadMicrobeDisclosure() {
             if (!key) continue;
 
             if (!disclosureByKey.has(key)) {
-                disclosureByKey.set(key, { displayName: toDisplayName(key), vendors: [] });
+                disclosureByKey.set(key, { displayName: toDisplayName(key), vendors: [], funcTags: new Set() });
             }
             disclosureByKey.get(key).vendors.push(vendor);
+            const funcTag = (row["기능태그"] || "").trim();
+            if (funcTag) disclosureByKey.get(key).funcTags.add(funcTag);
 
             const [genus, epithet] = key.split(" ");
             if (epithet && epithet !== "sp.") {
@@ -326,6 +328,26 @@ function loadMicrobeDisclosure() {
         }
     }
     console.log(`🏪 미생물 공시현황 판매처 정보 로드 완료: ${disclosureByKey.size}종 / 원본 ${rows.length}건`);
+}
+
+// 추천 후보로 줄 학명 목록(닫힌집합). 토양추천에는 토양개량/생장촉진 기능 종만 쓰고,
+// 그런 종이 없으면(데이터 누락 대비) 판매처 있는 전체 종으로 폴백한다.
+// 반환: 학술표기("Bacillus subtilis") 배열
+function getRecommendableSpecies(soilOnly = true) {
+    const all = [];
+    const soil = [];
+    for (const [key, entry] of disclosureByKey.entries()) {
+        if (key.endsWith(" sp.")) continue; // 속 단위 키는 후보에서 제외
+        all.push(entry.displayName);
+        if (entry.funcTags && entry.funcTags.has("soil_improvement")) soil.push(entry.displayName);
+    }
+    const list = soilOnly && soil.length > 0 ? soil : all;
+    return list.sort();
+}
+
+// canonicalSpeciesKey로 정규화한 추천 후보 키 집합(출력 검증용)
+function getRecommendableKeySet(soilOnly = true) {
+    return new Set(getRecommendableSpecies(soilOnly).map((s) => canonicalSpeciesKey(s)));
 }
 
 function findMicrobeVendorInfo(speciesName) {
@@ -509,11 +531,12 @@ function buildFarmStatsKorean(data) {
         .join(", ");
 }
 
-async function generateRecommendation(crop, data, queryText, sourceChunks) {
+async function generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies) {
     const sourcesText = sourceChunks
         .map((c, i) => `[${i + 1}] ${c.title} (${c.journal}, ${c.year})\n${c.text.slice(0, 800)}`)
         .join("\n\n");
     const farmStatsKorean = buildFarmStatsKorean(data);
+    const candidateList = candidateSpecies.join(", ");
 
     const prompt = `당신은 농업 미생물 전문가입니다. 아래 농경지 환경 데이터와 관련 논문 발췌문을 보고, 이 농경지에 가장 적합한 미생물을 추천해주세요.
 
@@ -523,6 +546,15 @@ async function generateRecommendation(crop, data, queryText, sourceChunks) {
 
 [관련 논문 발췌]
 ${sourcesText}
+
+[추천 가능 미생물 목록 (반드시 이 안에서만 선택)]
+${candidateList}
+
+추천 규칙(엄수):
+1. recommendedSpecies는 반드시 위 [추천 가능 미생물 목록]에 있는 학명만, 토씨 하나 틀리지 않게 그대로 사용한다.
+2. 반드시 "속(genus)+종(species)"이 모두 포함된 정확한 학명을 사용한다. "Bacillus sp.", "Pseudomonas spp."처럼 종을 특정하지 않은 속(genus) 단위 표기는 절대 금지한다.
+3. 목록에 없는 미생물은 아무리 적합해 보여도 추천하지 않는다.
+4. 환경 데이터와 논문 발췌에 비추어 가장 근거가 강한 종을 1~3개 고른다.
 
 다음 JSON 형식으로만 답변하세요 (다른 텍스트 없이):
 {
@@ -538,7 +570,7 @@ ${sourcesText}
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" },
+                generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048 },
             }),
         }
     );
@@ -580,7 +612,18 @@ app.get("/api/recommendMicrobe", async (req, res) => {
     try {
         queryText = buildQueryText(crop, data);
         const queryVector = await embedQuery(queryText);
-        sourceChunks = searchTopChunks(queryVector, 8);
+        // 청크는 같은 논문에서 여러 개 뽑힐 수 있어, 넉넉히(24개) 검색한 뒤 논문(doi/title) 단위로
+        // 중복 제거해 서로 다른 논문 8편이 들어가도록 한다 (참고문헌 중복 방지)
+        const rawChunks = searchTopChunks(queryVector, 24);
+        const seen = new Set();
+        sourceChunks = [];
+        for (const c of rawChunks) {
+            const id = (c.doi || c.title || "").trim().toLowerCase();
+            if (seen.has(id)) continue;
+            seen.add(id);
+            sourceChunks.push(c);
+            if (sourceChunks.length >= 8) break;
+        }
     } catch (error) {
         console.error("❌ 논문 검색 에러:", error.message);
         return res.status(500).json({ error: "논문 검색 중 에러 발생: " + error.message });
@@ -589,7 +632,21 @@ app.get("/api/recommendMicrobe", async (req, res) => {
     const sources = sourceChunks.map((c) => ({ title: c.title, journal: c.journal, year: c.year, doi: c.doi }));
 
     try {
-        const { recommendedSpecies, explanation, scientificEvidence } = await generateRecommendation(crop, data, queryText, sourceChunks);
+        const candidateSpecies = getRecommendableSpecies(true); // 토양추천: soil_improvement 종 우선
+        const candidateKeySet = getRecommendableKeySet(true);
+
+        const result = await generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies);
+        const explanation = result.explanation;
+        const scientificEvidence = result.scientificEvidence;
+        let recommendedSpecies = Array.isArray(result.recommendedSpecies) ? result.recommendedSpecies : [];
+
+        // 출력 검증: (1) 속 단위(sp./spp.) 표기 제거, (2) 후보 목록(닫힌집합) 밖이면 제거
+        recommendedSpecies = recommendedSpecies.filter((sp) => {
+            const key = canonicalSpeciesKey(sp);
+            if (!key || key.endsWith(" sp.")) return false; // 종 미특정 표기 차단
+            return candidateKeySet.has(key); // 48종(토양추천 시 26종) 화이트리스트 내만 허용
+        });
+
         const microbes = recommendedSpecies.map((species) => ({
             species,
             vendorInfo: findMicrobeVendorInfo(species),
