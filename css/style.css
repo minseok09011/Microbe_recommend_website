@@ -482,17 +482,17 @@ body {
     z-index: 1;
 }
 
-.site-mascot-wrap--left { left: 8px; }
-.site-mascot-wrap--right { right: 8px; }
+.site-mascot-wrap--left { left: 24px; }
+.site-mascot-wrap--right { right: 24px; }
 
 .site-mascot {
-    height: 150px;
-    max-width: 110px;
+    height: 260px;
+    max-width: 220px;
     object-fit: contain;
 }
 
 .site-mascot__caption {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--color-text-soft);
     opacity: 0.7;
@@ -501,13 +501,6 @@ body {
 /* 본문 카드(480px) 양옆에 마스코트가 들어갈 공간이 생기는 폭부터 표시 */
 @media (min-width: 760px) {
     .site-mascot-wrap { display: flex; }
-}
-
-@media (min-width: 1100px) {
-    .site-mascot-wrap--left { left: 24px; }
-    .site-mascot-wrap--right { right: 24px; }
-    .site-mascot { height: 260px; max-width: 220px; }
-    .site-mascot__caption { font-size: 13px; }
 }
 
 /* 아주 작은 폰(가로 360px 이하)에서 살짝 줄이기 */
