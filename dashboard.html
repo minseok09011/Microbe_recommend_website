@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 화면 - 우리밭 미생물 도우미</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main class="container">
+    <header class="page-header">
+        <a href="index.html" class="back-link" aria-label="홈으로">←</a>
+        <h1 class="page-title">🌱 내 화면</h1>
+    </header>
+
+    <h2 id="greeting" class="field__label" style="font-size:24px;">불러오는 중…</h2>
+
+    <div class="actions" style="margin-top:24px;">
+        <a href="records.html" class="btn btn--primary">📒 내 기록 보기</a>
+        <a href="record-form.html" class="btn btn--ghost">➕ 기록 추가하기</a>
+        <a href="index.html" class="btn btn--ghost">🔍 추천·살포 기능으로</a>
+        <a href="admin.html" id="adminBtn" class="btn btn--ghost" style="display:none;">🛠️ 관리자</a>
+        <button type="button" id="logoutBtn" class="btn btn--ghost">로그아웃</button>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseConfig.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    (async function () {
+        const session = await requireAuth();   // 세션 없으면 login.html로 보냄
+        if (!session) return;
+        const farmer = await getCurrentFarmer();
+        const name = (farmer && (farmer.name || farmer.username)) || "농민";
+        document.getElementById("greeting").textContent = `${name}님, 안녕하세요!`;
+        if (farmer && farmer.role === "admin") {
+            document.getElementById("adminBtn").style.display = "";
+        }
+    })();
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+</script>
+</body>
+</html>

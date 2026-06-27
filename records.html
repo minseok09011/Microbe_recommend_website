@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 기록 - 우리밭 미생물 도우미</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .rec-item { background: var(--color-card); border: 2px solid var(--color-line);
+                    border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-soft); }
+        .rec-item__top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .rec-item__date { font-size: 18px; font-weight: 700; color: var(--color-text); }
+        .rec-item__type { font-size: 14px; color: #fff; background: var(--color-primary);
+                          border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+        .rec-item__crop { font-size: 17px; color: var(--color-text); margin: 6px 0; }
+        .rec-item__memo { font-size: 15px; color: var(--color-text-soft); }
+        .rec-item__btns { display: flex; gap: 8px; margin-top: 12px; }
+        .rec-item__btns .btn { font-size: 16px; padding: 10px 14px; }
+    </style>
+</head>
+<body>
+<main class="container">
+    <header class="page-header">
+        <a href="dashboard.html" class="back-link" aria-label="뒤로">←</a>
+        <h1 class="page-title">📒 내 기록</h1>
+    </header>
+
+    <a href="record-form.html" class="btn btn--primary" style="margin-bottom:20px;">➕ 기록 추가하기</a>
+
+    <div id="list"><p class="notice">불러오는 중…</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseConfig.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/records.js"></script>
+<script>
+    const listEl = document.getElementById("list");
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    async function render() {
+        try {
+            const rows = await listMyRecords();
+            if (!rows.length) {
+                listEl.innerHTML = `<p class="notice">아직 기록이 없어요. <b>기록 추가하기</b>로 첫 기록을 남겨보세요.</p>`;
+                return;
+            }
+            listEl.innerHTML = rows.map((r) => `
+                <div class="rec-item">
+                    <div class="rec-item__top">
+                        <span class="rec-item__date">📅 ${esc(r.record_date) || "날짜 없음"}</span>
+                        <span class="rec-item__type">${esc(r.work_type) || "기타"}</span>
+                    </div>
+                    <p class="rec-item__crop">🌿 ${esc(r.crop_name) || "작물 미입력"}</p>
+                    ${r.memo ? `<p class="rec-item__memo">${esc(r.memo)}</p>` : ""}
+                    ${r.note ? `<p class="rec-item__memo">📌 ${esc(r.note)}</p>` : ""}
+                    <div class="rec-item__btns">
+                        <a class="btn btn--ghost" href="record-form.html?id=${encodeURIComponent(r.id)}">수정</a>
+                        <button class="btn btn--ghost" data-del="${encodeURIComponent(r.id)}">삭제</button>
+                    </div>
+                </div>`).join("");
+
+            listEl.querySelectorAll("[data-del]").forEach((b) => {
+                b.addEventListener("click", async () => {
+                    const id = decodeURIComponent(b.dataset.del);
+                    if (!confirm("이 기록을 삭제할까요? 되돌릴 수 없어요.")) return;
+                    try { await deleteRecord(id); render(); }
+                    catch (e) { alert("삭제에 실패했습니다: " + e.message); }
+                });
+            });
+        } catch (e) {
+            listEl.innerHTML = `<p class="notice">⚠️ 기록을 불러오지 못했습니다: ${esc(e.message)}</p>`;
+        }
+    }
+
+    (async function () {
+        const session = await requireAuth();
+        if (!session) return;
+        render();
+    })();
+</script>
+</body>
+</html>

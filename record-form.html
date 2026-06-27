@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기록 입력 - 우리밭 미생물 도우미</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main class="container">
+    <header class="page-header">
+        <a href="records.html" class="back-link" aria-label="뒤로">←</a>
+        <h1 class="page-title" id="title">➕ 기록 추가</h1>
+    </header>
+
+    <div class="field">
+        <label class="field__label" for="record_date">날짜</label>
+        <input type="date" id="record_date" class="field__input">
+    </div>
+    <div class="field">
+        <label class="field__label" for="crop_name">작물명</label>
+        <input type="text" id="crop_name" class="field__input" placeholder="예: 토마토">
+    </div>
+    <div class="field">
+        <label class="field__label" for="work_type">작업 종류</label>
+        <select id="work_type" class="field__select">
+            <option value="농약">농약</option>
+            <option value="미생물">미생물</option>
+            <option value="비료">비료</option>
+            <option value="기타">기타</option>
+        </select>
+    </div>
+    <div class="field">
+        <label class="field__label" for="memo">메모</label>
+        <input type="text" id="memo" class="field__input" placeholder="무엇을 했는지 간단히">
+    </div>
+    <div class="field">
+        <label class="field__label" for="note">특이사항</label>
+        <input type="text" id="note" class="field__input" placeholder="날씨, 병해충 등(선택)">
+    </div>
+
+    <button type="button" class="btn btn--primary" id="saveBtn">저장하기</button>
+    <p id="msg" class="notice" style="display:none; margin-top:14px;"></p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseConfig.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/records.js"></script>
+<script>
+    const params = new URLSearchParams(location.search);
+    const editId = params.get("id");
+    const msg = document.getElementById("msg");
+    function showMsg(t, ok) { msg.textContent = t; msg.style.display = "block"; msg.style.color = ok ? "#2e7d32" : ""; }
+    function val(id) { return document.getElementById(id).value.trim(); }
+    function setVal(id, v) { document.getElementById(id).value = v == null ? "" : v; }
+
+    async function init() {
+        const session = await requireAuth();
+        if (!session) return;
+
+        if (editId) {
+            document.getElementById("title").textContent = "✏️ 기록 수정";
+            try {
+                const r = await getRecord(editId);
+                setVal("record_date", r.record_date);
+                setVal("crop_name", r.crop_name);
+                document.getElementById("work_type").value = r.work_type || "기타";
+                setVal("memo", r.memo);
+                setVal("note", r.note);
+            } catch (e) { showMsg("기록을 불러오지 못했습니다: " + e.message); }
+        } else {
+            // 추천/시퀀스에서 넘어온 prefill 적용
+            if (params.get("prefill")) {
+                try {
+                    const p = JSON.parse(sessionStorage.getItem("recordPrefill") || "{}");
+                    setVal("record_date", p.record_date);
+                    setVal("crop_name", p.crop_name);
+                    if (p.work_type) document.getElementById("work_type").value = p.work_type;
+                    setVal("memo", p.memo);
+                    setVal("note", p.note);
+                    sessionStorage.removeItem("recordPrefill");
+                } catch (e) { /* noop */ }
+            }
+            if (!val("record_date")) setVal("record_date", new Date().toISOString().slice(0, 10));
+        }
+    }
+
+    async function save() {
+        const rec = { record_date: val("record_date"), crop_name: val("crop_name"),
+                      work_type: document.getElementById("work_type").value, memo: val("memo"), note: val("note") };
+        if (!rec.record_date) { showMsg("날짜를 입력해 주세요."); return; }
+        const btn = document.getElementById("saveBtn");
+        btn.disabled = true; btn.style.opacity = "0.6";
+        try {
+            if (editId) await updateRecord(editId, rec);
+            else await createRecord(rec);
+            showMsg("✅ 저장했습니다. 잠시 후 목록으로 이동합니다.", true);
+            setTimeout(() => window.location.href = "records.html", 700);
+        } catch (e) {
+            showMsg("저장에 실패했습니다: " + e.message);
+            btn.disabled = false; btn.style.opacity = "1";
+        }
+    }
+    document.getElementById("saveBtn").addEventListener("click", save);
+    init();
+</script>
+</body>
+</html>

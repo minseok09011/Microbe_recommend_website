@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 - 우리밭 미생물 도우미</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .farmer-item { background: var(--color-card); border: 2px solid var(--color-line);
+                       border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow-soft); }
+        .farmer-item b { font-size: 17px; }
+        .farmer-item .meta { font-size: 14px; color: var(--color-text-soft); margin-top: 4px; }
+        .role-admin { color: #fff; background: #d64545; border-radius: 999px; padding: 1px 8px; font-size: 13px; }
+        .role-farmer { color: #fff; background: var(--color-primary); border-radius: 999px; padding: 1px 8px; font-size: 13px; }
+        hr { border: none; border-top: 2px solid var(--color-line); margin: 28px 0; }
+    </style>
+</head>
+<body>
+<main class="container">
+    <header class="page-header">
+        <a href="dashboard.html" class="back-link" aria-label="뒤로">←</a>
+        <h1 class="page-title">🛠️ 관리자</h1>
+    </header>
+
+    <h2 class="field__label" style="font-size:20px;">농민 계정 만들기</h2>
+    <div class="field"><label class="field__label" for="f_username">아이디</label>
+        <input type="text" id="f_username" class="field__input" placeholder="영문/숫자, 예: hong123" autocapitalize="none"></div>
+    <div class="field"><label class="field__label" for="f_password">초기 비밀번호</label>
+        <input type="text" id="f_password" class="field__input" placeholder="6자 이상"></div>
+    <div class="field"><label class="field__label" for="f_name">이름</label>
+        <input type="text" id="f_name" class="field__input" placeholder="예: 홍길동"></div>
+    <div class="field"><label class="field__label" for="f_phone">연락처</label>
+        <input type="text" id="f_phone" class="field__input" placeholder="예: 010-1234-5678"></div>
+    <div class="field"><label class="field__label" for="f_region">지역</label>
+        <input type="text" id="f_region" class="field__input" placeholder="예: 전남 화순"></div>
+    <div class="field"><label class="field__label" for="f_role">권한</label>
+        <select id="f_role" class="field__select"><option value="farmer">농민</option><option value="admin">관리자</option></select></div>
+
+    <button type="button" class="btn btn--primary" id="createBtn">계정 만들기</button>
+    <p id="msg" class="notice" style="display:none; margin-top:14px;"></p>
+
+    <hr>
+
+    <h2 class="field__label" style="font-size:20px;">농민 목록</h2>
+    <div id="farmerList"><p class="notice">불러오는 중…</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseConfig.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/admin.js"></script>
+<script>
+    const msg = document.getElementById("msg");
+    function showMsg(t, ok) { msg.textContent = t; msg.style.display = "block"; msg.style.color = ok ? "#2e7d32" : ""; }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+    function val(id) { return document.getElementById(id).value.trim(); }
+
+    async function renderFarmers() {
+        const box = document.getElementById("farmerList");
+        try {
+            const rows = await listFarmers();
+            if (!rows.length) { box.innerHTML = `<p class="notice">아직 등록된 농민이 없습니다.</p>`; return; }
+            box.innerHTML = rows.map((f) => `
+                <div class="farmer-item">
+                    <b>${esc(f.name) || "(이름없음)"}</b>
+                    <span class="role-${f.role === "admin" ? "admin" : "farmer"}">${f.role === "admin" ? "관리자" : "농민"}</span>
+                    <div class="meta">아이디: ${esc(f.username) || "-"} · ${esc(f.region) || "지역미상"} · ${esc(f.phone) || "연락처없음"}</div>
+                </div>`).join("");
+        } catch (e) { box.innerHTML = `<p class="notice">⚠️ 목록 조회 실패: ${esc(e.message)}</p>`; }
+    }
+
+    async function createFarmer() {
+        const username = val("f_username"), password = val("f_password");
+        if (!username || !password) { showMsg("아이디와 초기 비밀번호는 필수입니다."); return; }
+        const btn = document.getElementById("createBtn");
+        btn.disabled = true; btn.style.opacity = "0.6";
+        try {
+            await createFarmerAccount({
+                username, password,
+                name: val("f_name"), phone: val("f_phone"), region: val("f_region"),
+                role: document.getElementById("f_role").value,
+            });
+            showMsg(`✅ '${username}' 계정을 만들었습니다.`, true);
+            ["f_username", "f_password", "f_name", "f_phone", "f_region"].forEach((id) => document.getElementById(id).value = "");
+            renderFarmers();
+        } catch (e) {
+            showMsg("계정 생성 실패: " + e.message);
+        } finally {
+            btn.disabled = false; btn.style.opacity = "1";
+        }
+    }
+
+    (async function () {
+        const admin = await requireAdmin();   // 비관리자/비로그인 차단
+        if (!admin) return;
+        renderFarmers();
+        document.getElementById("createBtn").addEventListener("click", createFarmer);
+    })();
+</script>
+</body>
+</html>
