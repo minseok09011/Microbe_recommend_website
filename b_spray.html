@@ -3,9 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>살포 가능 확인 - 우리밭 미생물 도우미</title>
+    <title>살포 시퀀스 - 우리밭 미생물 도우미</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 살포 시퀀스 입력 전용 보조 스타일 (기존 클래스 위에 최소 추가) */
+        .mat-row { position: relative; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
+        .mat-row__name { flex: 1 1 auto; }
+        .mat-row__date { flex: 0 0 150px; }
+        .mat-row__del { flex: 0 0 auto; border: none; background: #f3f4f6; border-radius: 10px;
+                        width: 42px; cursor: pointer; font-size: 18px; color: #9ca3af; }
+        .mat-row__del:hover { background: #fde2e2; color: #d64545; }
+        .ac-box { position: absolute; top: 100%; left: 0; right: 158px; z-index: 20; background: #fff;
+                  border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.10);
+                  max-height: 240px; overflow-y: auto; margin-top: 4px; }
+        .ac-item { padding: 10px 12px; cursor: pointer; font-size: 14px; }
+        .ac-item:hover, .ac-item.is-active { background: #ecfdf5; }
+        .ac-item__type { font-size: 11px; color: #6b7280; margin-left: 6px; }
+        .mat-row__tag { display:inline-block; font-size:11px; color:#fff; background:#16a34a;
+                        border-radius:6px; padding:1px 6px; margin-top:4px; }
+        .mat-row__tag--type { background:#2563eb; }
+        .typebtn-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .typebtn { border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 6px 12px;
+                   font-size: 13px; cursor: pointer; }
+        .typebtn:hover { border-color: #16a34a; color: #16a34a; }
+        .inoc-card { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px; margin-bottom:8px; }
+        .inoc-choice { display:flex; gap:8px; flex-wrap:wrap; }
+        .muted { color:#6b7280; font-size:13px; }
+        .add-btn { width:100%; border:1px dashed #cbd5e1; background:#fff; border-radius:10px;
+                   padding:12px; cursor:pointer; color:#16a34a; font-weight:600; }
+        .add-btn:hover { background:#f0fdf4; }
+    </style>
 </head>
 <body>
 
@@ -13,40 +41,282 @@
 
     <header class="page-header">
         <a href="index.html" class="back-link" aria-label="홈으로">←</a>
-        <h1 class="page-title">✅ 살포 가능 확인</h1>
+        <h1 class="page-title">🗓️ 미생물 언제 뿌릴까</h1>
     </header>
 
+    <p class="muted" style="margin:-6px 0 18px;">
+        최근에 친 농약·친환경·비료·소독제를 적으면, 미생물제를 며칠 뒤 뿌려야
+        안 죽고 살아남는지 계산해 드려요.
+    </p>
+
+    <!-- ① 어떤 미생물을 쓰는지 (추천에서 넘어왔으면 자동 고정) -->
     <div class="field">
-        <label class="field__label" for="sprayLast">최근에 무엇을 뿌리셨어요?</label>
-        <select id="sprayLast" class="field__select">
-            <option value="chemical">농약</option>
-            <option value="microbe">미생물 약제</option>
-            <option value="nutrient">영양제(비료)</option>
-            <option value="none">아무것도 안 뿌렸어요</option>
-        </select>
+        <label class="field__label">① 어떤 미생물을 뿌리세요?</label>
+        <div id="inoculantSection"></div>
     </div>
 
+    <!-- ② 최근 친 자재들 -->
     <div class="field">
-        <label class="field__label" for="sprayLastDate">언제 뿌리셨어요?</label>
-        <span class="field__hint">날짜를 골라 주세요</span>
-        <input type="date" id="sprayLastDate" class="field__input">
+        <label class="field__label">② 최근에 무엇을 뿌리셨어요? (여러 개 추가 가능)</label>
+        <span class="field__hint">제품 이름을 치면 후보가 떠요. 비료·소독제는 아래 버튼으로 골라요.</span>
+        <div id="materialRows"></div>
+        <button type="button" class="add-btn" id="addMaterialBtn">＋ 자재 추가</button>
+
+        <div class="typebtn-wrap" id="typeBtns"></div>
     </div>
 
+    <!-- ③ 미생물 살포 예정일 -->
     <div class="field">
-        <label class="field__label" for="sprayNext">이번에 무엇을 뿌리려고 하세요?</label>
-        <select id="sprayNext" class="field__select">
-            <option value="microbe">미생물 약제</option>
-            <option value="chemical">농약</option>
-            <option value="nutrient">영양제(비료)</option>
-        </select>
+        <label class="field__label" for="inoculantDate">③ 미생물제는 언제 뿌릴 예정이세요?</label>
+        <span class="field__hint">비워두면 오늘 기준으로 계산해요</span>
+        <input type="date" id="inoculantDate" class="field__input">
     </div>
 
-    <button type="button" class="btn btn--primary" onclick="submitSpray()">
-        뿌려도 되는지 확인하기 ➔
+    <button type="button" class="btn btn--primary" id="submitBtn">
+        언제 뿌릴 수 있는지 확인하기 ➔
     </button>
+    <p id="formMsg" class="notice" style="display:none; margin-top:12px;"></p>
 
 </main>
 
 <script src="js/app.js"></script>
+<script>
+/* ============================================================
+   살포 시퀀스 입력 화면 (B-경로)
+   - 자재 여러 개 + 자동완성 + 비료/소독제 종류 버튼
+   - 균종: 추천에서 넘어온 학명 있으면 자동 고정, 없으면 직접 선택
+   - 제출 시 localStorage 저장 후 b-1_spray-result.html 로 이동
+   ============================================================ */
+const BACKEND = "https://microbe-recommend-website.onrender.com";
+
+// 비료·소독제 종류 버튼 (value = spray_sequence.js TYPE_RULES 키)
+const TYPE_OPTIONS = [
+    { key: "fert_nitrogen",   label: "질소·칼리·복합비료" },
+    { key: "fert_lime",       label: "석회·규산·고토(토양개량)" },
+    { key: "fert_rawmanure",  label: "미부숙 가축분" },
+    { key: "fert_compost",    label: "완숙퇴비·유기질비료" },
+    { key: "fert_nutrient",   label: "영양제·미량요소·엽면시비" },
+    { key: "fert_cyanamide",  label: "석회질소" },
+    { key: "disinf_oxidizer", label: "산화제 소독제" },
+    { key: "disinf_chlorine", label: "염소계 소독제" },
+    { key: "microbe",         label: "다른 미생물 약제" },
+];
+const TYPE_LABEL = Object.fromEntries(TYPE_OPTIONS.map(o => [o.key, o.label]));
+
+// 학명 → 세균/곰팡이 (표시용 간이 판정; 실제 판정은 백엔드가 함)
+const BACT = ["bacillus","paenibacillus","pseudomonas","lactobacillus","lactiplantibacillus","priestia","streptomyces","azospirillum","rhizobium","bradyrhizobium","burkholderia","serratia","lysobacter","azotobacter"];
+const FUNG = ["trichoderma","beauveria","metarhizium","glomus","funneliformis","rhizophagus","paecilomyces","purpureocillium","aspergillus","penicillium","clonostachys","lecanicillium"];
+function guessInoculantType(species) {
+    const g = (species || "").trim().toLowerCase().split(/\s+/)[0];
+    if (BACT.includes(g)) return "bacteria";
+    if (FUNG.includes(g)) return "fungus";
+    return "both";
+}
+const TYPE_KO = { bacteria: "세균제", fungus: "곰팡이제", both: "균종 미상(보수적)" };
+
+// ── 균종 결정 상태 ──────────────────────────────────────────
+let inoculantType = "both";
+let inoculantSpecies = "";
+
+function renderInoculantSection() {
+    const box = document.getElementById("inoculantSection");
+    // 추천 결과에서 넘어온 학명이 있으면 자동 고정
+    const fromRec = (localStorage.getItem("inoculantSpecies") || "").trim();
+    if (fromRec) {
+        inoculantSpecies = fromRec;
+        inoculantType = guessInoculantType(fromRec);
+        box.innerHTML = `
+            <div class="inoc-card">
+                추천받은 <b>${fromRec}</b>
+                <span class="mat-row__tag">${TYPE_KO[inoculantType]}</span>
+                기준으로 계산합니다.
+                <div class="muted" style="margin-top:6px;">다른 미생물로 바꾸려면 아래에서 다시 고르세요.</div>
+                <div class="inoc-choice" style="margin-top:10px;">
+                    <button type="button" class="typebtn" onclick="clearInoculant()">다른 미생물로 바꾸기</button>
+                </div>
+            </div>`;
+        return;
+    }
+    // 직접 선택 UI
+    box.innerHTML = `
+        <div class="inoc-card">
+            <div class="muted" style="margin-bottom:8px;">쓰실 미생물 제품의 학명을 알면 적어주세요. 모르면 보수적으로 계산해요.</div>
+            <input type="text" id="inoculantSpeciesInput" class="field__input"
+                   placeholder="예: Bacillus subtilis / Trichoderma harzianum" value="${inoculantSpecies}">
+            <div class="inoc-choice" style="margin-top:10px;">
+                <button type="button" class="typebtn" id="inocConfirmBtn">이 미생물로 계산</button>
+                <button type="button" class="typebtn" onclick="setUnknownInoculant()">잘 모르겠어요 (보수적으로)</button>
+            </div>
+            <div id="inocState" class="muted" style="margin-top:8px;"></div>
+        </div>`;
+    document.getElementById("inocConfirmBtn").addEventListener("click", () => {
+        const v = document.getElementById("inoculantSpeciesInput").value.trim();
+        if (!v) { setUnknownInoculant(); return; }
+        inoculantSpecies = v;
+        inoculantType = guessInoculantType(v);
+        document.getElementById("inocState").innerHTML =
+            `<b>${v}</b> → ${TYPE_KO[inoculantType]} 기준으로 계산합니다.`;
+    });
+}
+function clearInoculant() {
+    localStorage.removeItem("inoculantSpecies");
+    inoculantSpecies = ""; inoculantType = "both";
+    renderInoculantSection();
+}
+function setUnknownInoculant() {
+    inoculantSpecies = ""; inoculantType = "both";
+    const el = document.getElementById("inocState");
+    if (el) el.innerHTML = "균종을 모를 땐 세균·곰팡이 둘 중 더 위험한 쪽으로 <b>보수적으로</b> 계산해요.";
+}
+
+// ── 자재 행 ────────────────────────────────────────────────
+let rowSeq = 0;
+function addMaterialRow(preset) {
+    const id = "row" + (rowSeq++);
+    const wrap = document.createElement("div");
+    wrap.className = "mat-row";
+    wrap.id = id;
+    wrap.dataset.kind = "";     // pesticide | eco | type
+    wrap.dataset.name = "";     // 확정된 자재명/종류키
+    wrap.innerHTML = `
+        <div class="mat-row__name">
+            <input type="text" class="field__input mat-input" placeholder="제품 이름 (예: 코사이드)" autocomplete="off">
+            <div class="mat-tag"></div>
+        </div>
+        <input type="date" class="field__input mat-row__date mat-date">
+        <button type="button" class="mat-row__del" title="삭제">✕</button>`;
+    document.getElementById("materialRows").appendChild(wrap);
+
+    const input = wrap.querySelector(".mat-input");
+    const del = wrap.querySelector(".mat-row__del");
+    del.addEventListener("click", () => wrap.remove());
+
+    // 입력이 바뀌면 확정상태 해제 + 자동완성
+    let timer = null;
+    input.addEventListener("input", () => {
+        wrap.dataset.kind = ""; wrap.dataset.name = "";
+        wrap.querySelector(".mat-tag").innerHTML = "";
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (q.length < 1) { closeAc(wrap); return; }
+        timer = setTimeout(() => fetchSuggestions(wrap, input, q), 220);
+    });
+    input.addEventListener("blur", () => setTimeout(() => closeAc(wrap), 180));
+
+    if (preset) {
+        input.value = preset.label;
+        wrap.dataset.kind = preset.kind;
+        wrap.dataset.name = preset.name;
+        wrap.querySelector(".mat-tag").innerHTML =
+            `<span class="mat-row__tag mat-row__tag--type">${preset.label}</span>`;
+        input.readOnly = (preset.kind === "type");
+    }
+    return wrap;
+}
+
+function closeAc(wrap) {
+    const old = wrap.querySelector(".ac-box");
+    if (old) old.remove();
+}
+
+async function fetchSuggestions(wrap, input, q) {
+    try {
+        const res = await fetch(`${BACKEND}/api/sprayMaterials?q=${encodeURIComponent(q)}&limit=8`);
+        if (!res.ok) return;
+        const items = await res.json();
+        closeAc(wrap);
+        if (!items.length) return;
+        const box = document.createElement("div");
+        box.className = "ac-box";
+        box.innerHTML = items.map(it =>
+            `<div class="ac-item" data-name="${encodeURIComponent(it.name)}" data-type="${it.type}">
+                ${it.name}<span class="ac-item__type">${it.type === "eco" ? "친환경" : "농약"} · ${it.family || ""}</span>
+            </div>`).join("");
+        box.querySelectorAll(".ac-item").forEach(el => {
+            el.addEventListener("mousedown", (e) => {  // blur보다 먼저 처리되도록 mousedown
+                e.preventDefault();
+                const name = decodeURIComponent(el.dataset.name);
+                input.value = name;
+                wrap.dataset.kind = el.dataset.type;   // "pesticide" | "eco"
+                wrap.dataset.name = name;
+                wrap.querySelector(".mat-tag").innerHTML =
+                    `<span class="mat-row__tag">${el.dataset.type === "eco" ? "친환경" : "농약"} 선택됨</span>`;
+                closeAc(wrap);
+            });
+        });
+        wrap.appendChild(box);
+    } catch (e) { /* 네트워크 오류 시 조용히 무시 */ }
+}
+
+// 비료/소독제 종류 버튼 → 새 행을 type 자재로 추가
+function renderTypeButtons() {
+    const wrap = document.getElementById("typeBtns");
+    wrap.innerHTML = `<span class="muted" style="width:100%;">비료·소독제는 여기서 골라 추가 →</span>` +
+        TYPE_OPTIONS.map(o => `<button type="button" class="typebtn" data-key="${o.key}">${o.label}</button>`).join("");
+    wrap.querySelectorAll(".typebtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            addMaterialRow({ kind: "type", name: btn.dataset.key, label: TYPE_LABEL[btn.dataset.key] });
+        });
+    });
+}
+
+// ── 제출 ───────────────────────────────────────────────────
+function collectMaterials() {
+    const rows = [...document.querySelectorAll(".mat-row")];
+    const materials = [];
+    const problems = [];
+    for (const wrap of rows) {
+        const input = wrap.querySelector(".mat-input");
+        const date = wrap.querySelector(".mat-date").value;
+        const typed = input.value.trim();
+        if (!typed && !wrap.dataset.name) continue;        // 빈 행은 건너뜀
+        if (!date) { problems.push(`'${typed || wrap.dataset.name}'의 살포일을 골라주세요.`); continue; }
+        // 후보에서 안 고르고 직접 친 경우: kind 미지정 → 백엔드가 양쪽 표를 뒤지고, 못 찾으면 보수적 처리
+        const kind = wrap.dataset.kind || "pesticide";
+        const name = wrap.dataset.name || typed;
+        const label = (kind === "type") ? TYPE_LABEL[name] : name;
+        materials.push({ kind, name, appliedDate: date, label });
+    }
+    return { materials, problems };
+}
+
+document.getElementById("submitBtn").addEventListener("click", () => {
+    const msg = document.getElementById("formMsg");
+    const { materials, problems } = collectMaterials();
+
+    if (materials.length === 0) {
+        showMsg("최근에 친 자재를 1개 이상 추가해주세요. (없으면 '아무것도 안 뿌림'을 고르세요)");
+        return;
+    }
+    if (problems.length) { showMsg(problems[0]); return; }
+
+    // 위치정보: 추천(a_recommend) 경로에서 저장된 게 있으면 기온 조회에 재사용
+    const loc = {
+        lat: localStorage.getItem("userLat") || null,
+        lng: localStorage.getItem("userLng") || null,
+        obsrSpotCd: localStorage.getItem("userObsrSpotCd") || null,
+    };
+
+    localStorage.setItem("spraySeqMaterials", JSON.stringify(materials));
+    localStorage.setItem("spraySeqInoculantType", inoculantType);
+    localStorage.setItem("spraySeqInoculantSpecies", inoculantSpecies || "");
+    localStorage.setItem("spraySeqInoculantDate", document.getElementById("inoculantDate").value || "");
+    localStorage.setItem("spraySeqLocation", JSON.stringify(loc));
+
+    window.location.href = "b-1_spray-result.html";
+});
+
+function showMsg(text) {
+    const msg = document.getElementById("formMsg");
+    msg.textContent = text;
+    msg.style.display = "block";
+}
+
+// ── 초기화 ─────────────────────────────────────────────────
+renderInoculantSection();
+renderTypeButtons();
+addMaterialRow(); // 첫 행 하나
+document.getElementById("addMaterialBtn").addEventListener("click", () => addMaterialRow());
+</script>
 </body>
 </html>
