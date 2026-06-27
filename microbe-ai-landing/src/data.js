@@ -236,6 +236,32 @@ function looksLikeSpecies(name) {
   return /^[A-Za-z][A-Za-z.\-]+\s+[A-Za-z][A-Za-z.\-]+/.test((name || "").trim());
 }
 
+// 백엔드 server.js의 BACTERIA_GENERA/FUNGUS_GENERA/classifyInoculantSpecies 사본.
+// ⚠️ "종류 선택" 버튼을 자동으로 미리 골라주는 화면 표시용이라, 백엔드 목록이 바뀌면 같이 맞춰야 함.
+const BACTERIA_GENERA = new Set([
+  "bacillus", "paenibacillus", "pseudomonas", "lactobacillus", "lactiplantibacillus", "lacticaseibacillus",
+  "limosilactobacillus", "latilactobacillus", "lactococcus", "priestia", "streptomyces", "azospirillum", "rhizobium",
+  "bradyrhizobium", "sinorhizobium", "mesorhizobium", "azotobacter", "burkholderia", "paraburkholderia",
+  "serratia", "lysobacter", "enterobacter", "klebsiella", "gluconacetobacter", "acetobacter", "nitrobacter",
+  "nitrosomonas", "rhodopseudomonas", "rhodobacter", "micrococcus", "arthrobacter", "agrobacterium",
+  "photorhabdus",
+]);
+const FUNGUS_GENERA = new Set([
+  "trichoderma", "beauveria", "metarhizium", "glomus", "funneliformis", "rhizophagus", "claroideoglomus",
+  "paecilomyces", "purpureocillium", "aspergillus", "penicillium", "clonostachys", "gliocladium",
+  "coniothyrium", "ampelomyces", "lecanicillium", "verticillium", "isaria", "cordyceps", "pochonia",
+  "saccharomyces", "candida", "pichia", "aureobasidium", "talaromyces",
+]);
+
+// 추천 결과에서 넘어온 학명으로 "세균제/곰팡이제" 종류 버튼을 미리 선택해줌. 모르면 "both".
+export function classifyInoculantSpecies(speciesName) {
+  if (!looksLikeSpecies(speciesName)) return "both";
+  const genus = speciesName.trim().split(/\s+/)[0].toLowerCase();
+  if (BACTERIA_GENERA.has(genus)) return "bacteria";
+  if (FUNGUS_GENERA.has(genus)) return "fungus";
+  return "both";
+}
+
 // payload: { inoculantName, inoculantType, inoculantDate, materials:[{name,kind,appliedDate}] }
 export async function fetchSpraySequence({ inoculantName, inoculantType, inoculantDate, materials }) {
   const body = {

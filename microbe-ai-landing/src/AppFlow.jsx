@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Lightbulb,
 } from "lucide-react";
-import { CROPS, LOAD_STEPS, delay, searchAddress, fetchRecommend, searchSprayMaterials, fetchSpraySequence } from "./data.js";
+import { CROPS, LOAD_STEPS, delay, searchAddress, fetchRecommend, searchSprayMaterials, fetchSpraySequence, classifyInoculantSpecies } from "./data.js";
 import SaveRecordButton from "./SaveRecordButton.jsx";
 import { listMyRecentAddresses } from "./records.js";
 import { Reveal } from "./LandingPage.jsx";
@@ -444,6 +444,12 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const [vendorCounts, setVendorCounts] = useState({});
   const [showReasons, setShowReasons] = useState({});
   const toggleReason = (i) => setShowReasons((prev) => ({ ...prev, [i]: !prev[i] }));
+  const [showAllPrices, setShowAllPrices] = useState({});
+  const toggleAllPrices = (key) => setShowAllPrices((prev) => ({ ...prev, [key]: !prev[key] }));
+  const parsePriceValue = (priceStr) => {
+    const m = (priceStr || "").match(/[\d,]+/);
+    return m ? parseInt(m[0].replace(/,/g, ""), 10) : Infinity;
+  };
   const getVendorCount = (i) => vendorCounts[i] ?? 3;
   const showMoreVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: getVendorCount(i) + 5 }));
   const collapseVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: 3 }));
@@ -679,10 +685,12 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                             const products = v.products || [
                               { product: v.productName || v.name, price: v.price, contact: v.phone, onlineUrl: v.onlineUrl },
                             ];
-                            const productLabel = products[0]?.product
-                              ? `${products[0].product}${products.length > 1 ? ` 외 ${products.length - 1}개` : ""}`
-                              : "";
-                            const priceLabel = products.map((p) => p.price).filter(Boolean).join(", ");
+                            const sortedProducts = [...products].sort(
+                              (a, b) => parsePriceValue(a.price) - parsePriceValue(b.price)
+                            );
+                            const cheapest = sortedProducts[0];
+                            const extraCount = products.length - 1;
+                            const priceKey = `${i}-${vi}`;
                             const onlineUrl = products.find((p) => p.onlineUrl)?.onlineUrl;
                             const contact = products[0]?.contact;
                             return (
@@ -694,14 +702,32 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <strong className="text-sm text-stone-900">{v.company || v.seller || ""}</strong>
-                                  {priceLabel && (
+                                  {cheapest?.price && (
                                     <span className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 whitespace-nowrap">
                                       <Tag className="h-3 w-3" />
-                                      {priceLabel}
+                                      {cheapest.price}
                                     </span>
                                   )}
                                 </div>
-                                {productLabel && <div className="text-stone-600 mt-1">{productLabel}</div>}
+                                {cheapest?.product && <div className="text-stone-600 mt-1">{cheapest.product}</div>}
+                                {extraCount > 0 && (
+                                  <button
+                                    onClick={() => toggleAllPrices(priceKey)}
+                                    className="mt-1 text-[11px] font-semibold text-stone-400 underline"
+                                  >
+                                    {showAllPrices[priceKey] ? "가격 접기" : `다른 가격 ${extraCount}개 더보기`}
+                                  </button>
+                                )}
+                                {showAllPrices[priceKey] && (
+                                  <ul className="mt-1.5 space-y-0.5">
+                                    {sortedProducts.slice(1).map((p, pi) => (
+                                      <li key={pi} className="flex items-center justify-between text-stone-500">
+                                        <span>{p.product}</span>
+                                        <span className="font-semibold text-stone-700">{p.price}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
                                 {(contact || onlineUrl) && (
                                   <div className="mt-1.5 flex items-center gap-2">
                                     {contact && (
@@ -964,7 +990,7 @@ export function CheckScreen({ prefill, onBack, onResult }) {
 
   useEffect(() => {
     setInoculantName(prefill?.microbe || "");
-    setInoculantType("both");
+    setInoculantType(classifyInoculantSpecies(prefill?.microbe));
     setInoculantDate(todayStr());
     setMaterials([newMaterial()]);
   }, [prefill]);

@@ -343,10 +343,11 @@ function lookupMaterialRisk(name, kind) {
 // 미생물 학명의 속(genus)으로 세균제/곰팡이제 판정. 모르면 "both"(보수적).
 const BACTERIA_GENERA = new Set([
     "bacillus", "paenibacillus", "pseudomonas", "lactobacillus", "lactiplantibacillus", "lacticaseibacillus",
-    "limosilactobacillus", "latilactobacillus", "priestia", "streptomyces", "azospirillum", "rhizobium",
+    "limosilactobacillus", "latilactobacillus", "lactococcus", "priestia", "streptomyces", "azospirillum", "rhizobium",
     "bradyrhizobium", "sinorhizobium", "mesorhizobium", "azotobacter", "burkholderia", "paraburkholderia",
     "serratia", "lysobacter", "enterobacter", "klebsiella", "gluconacetobacter", "acetobacter", "nitrobacter",
     "nitrosomonas", "rhodopseudomonas", "rhodobacter", "micrococcus", "arthrobacter", "agrobacterium",
+    "photorhabdus",
 ]);
 const FUNGUS_GENERA = new Set([
     "trichoderma", "beauveria", "metarhizium", "glomus", "funneliformis", "rhizophagus", "claroideoglomus",
