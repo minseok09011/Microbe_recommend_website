@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, Sprout, FlaskConical } from "lucide-react";
 import { listMyRecords } from "./records.js";
 
 /* "내 기록" 목록 (최소 범위: 저장한 추천/살포 결과를 다시 보기) */
-export default function RecordsScreen({ onBack }) {
+export default function RecordsScreen({ onBack, onSelect }) {
   const [rows, setRows] = useState(null); // null=로딩, []=비어있음
   const [err, setErr] = useState("");
 
@@ -44,7 +44,12 @@ export default function RecordsScreen({ onBack }) {
           {rows?.map((r) => {
             const isSpray = r.kind === "spray";
             return (
-              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-stone-100 p-4">
+              <button
+                key={r.id}
+                onClick={() => onSelect?.(r)}
+                disabled={!onSelect || !r.payload}
+                className="block w-full text-left bg-white rounded-xl shadow-sm border border-stone-100 p-4 disabled:cursor-default hover:border-emerald-300 transition-colors"
+              >
                 <div className="flex items-center justify-between mb-1">
                   <span
                     className={`inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-0.5 ${
@@ -59,7 +64,8 @@ export default function RecordsScreen({ onBack }) {
                 <p className="font-semibold text-stone-800">{r.title || (isSpray ? "살포 확인 결과" : "추천 결과")}</p>
                 {r.crop && <p className="text-xs text-stone-500 mt-0.5">작물: {r.crop}</p>}
                 {r.summary && <p className="text-sm text-stone-600 mt-1 leading-relaxed">{r.summary}</p>}
-              </div>
+                {r.payload && <p className="text-xs text-emerald-600 font-semibold mt-2">결과 다시 보기 →</p>}
+              </button>
             );
           })}
         </div>

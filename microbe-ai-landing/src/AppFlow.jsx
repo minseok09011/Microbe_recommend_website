@@ -442,6 +442,8 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const [showSoilInfo, setShowSoilInfo] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [vendorCounts, setVendorCounts] = useState({});
+  const [showReasons, setShowReasons] = useState({});
+  const toggleReason = (i) => setShowReasons((prev) => ({ ...prev, [i]: !prev[i] }));
   const getVendorCount = (i) => vendorCounts[i] ?? 3;
   const showMoreVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: getVendorCount(i) + 5 }));
   const collapseVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: 3 }));
@@ -570,10 +572,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
             const species = m.species || m.name || m.korName || m.korean_name || "미생물명";
             const vendor = m.vendorInfo;
             const tags = m.tags || m.effects || [];
-            const priceRange =
-              vendor && (vendor.priceMin || vendor.priceMax)
-                ? `${vendor.priceMin?.toLocaleString() ?? "-"}원 ~ ${vendor.priceMax?.toLocaleString() ?? "-"}원`
-                : null;
             const vendors = vendor?.vendors || m.sellers || m.products || [];
             const isTop = i === 0;
             return (
@@ -635,11 +633,20 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                     )}
 
                     {m.reason && (
-                      <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-900 text-xs px-3 py-2.5 mb-3.5 leading-relaxed">
-                        <Lightbulb className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <span>
-                          <strong className="font-bold">AI 선정 이유</strong> — {m.reason}
-                        </span>
+                      <div className="mb-3.5">
+                        <button
+                          onClick={() => toggleReason(i)}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                        >
+                          <Lightbulb className="h-3.5 w-3.5" />
+                          AI 선정 이유 {showReasons[i] ? "접기" : "보기"}
+                        </button>
+                        {showReasons[i] && (
+                          <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-900 text-xs px-3 py-2.5 mt-2 leading-relaxed">
+                            <Lightbulb className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <span>{m.reason}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -659,16 +666,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                             {t}
                           </span>
                         ))}
-                      </div>
-                    )}
-
-                    {priceRange && (
-                      <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 mb-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500">
-                          <Tag className="h-3.5 w-3.5" />
-                          예상 가격대
-                        </span>
-                        <span className="text-base font-bold text-stone-900">{priceRange}</span>
                       </div>
                     )}
 
@@ -695,9 +692,16 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                                   isTop ? "border-l-amber-400" : "border-l-emerald-600"
                                 } border-y border-r border-stone-200 bg-stone-50 px-3.5 py-3 text-xs`}
                               >
-                                <strong className="text-sm text-stone-900">{v.company || v.seller || ""}</strong>
+                                <div className="flex items-start justify-between gap-2">
+                                  <strong className="text-sm text-stone-900">{v.company || v.seller || ""}</strong>
+                                  {priceLabel && (
+                                    <span className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 whitespace-nowrap">
+                                      <Tag className="h-3 w-3" />
+                                      {priceLabel}
+                                    </span>
+                                  )}
+                                </div>
                                 {productLabel && <div className="text-stone-600 mt-1">{productLabel}</div>}
-                                {priceLabel && <div className="text-stone-500 mt-0.5">{priceLabel}</div>}
                                 {(contact || onlineUrl) && (
                                   <div className="mt-1.5 flex items-center gap-2">
                                     {contact && (

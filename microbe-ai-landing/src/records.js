@@ -85,7 +85,7 @@ export async function listMyRecords() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("records")
-    .select("id, kind, title, crop, summary, created_at")
+    .select("id, kind, title, crop, summary, payload, created_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];

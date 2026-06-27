@@ -13,6 +13,7 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [checkPrefill, setCheckPrefill] = useState({ microbe: "", crop: "" });
   const [checkResult, setCheckResult] = useState(null);
+  const [viewingRecord, setViewingRecord] = useState(false); // 내 기록에서 결과를 다시 보는 중인지
 
   // 실제 인증 상태 (Supabase 세션). 새로고침/재방문에도 유지되며, 미설정 시 null.
   const [user, setUser] = useState(null);
@@ -36,16 +37,40 @@ export default function App() {
   function startRecommend() {
     setCrop(null);
     setAddress(null);
+    setViewingRecord(false);
     setView("crop");
   }
 
   function startCheck() {
     setCheckPrefill({ microbe: "", crop: "" });
+    setViewingRecord(false);
     setView("check");
   }
 
   function startMyRecords() {
     setView("records");
+    window.scrollTo(0, 0);
+  }
+
+  // 내 기록 카드를 눌렀을 때 — 저장된 payload로 결과 화면을 그대로 재출력
+  function handleSelectRecord(r) {
+    if (!r.payload) return;
+    setViewingRecord(true);
+    if (r.kind === "spray") {
+      setCheckResult(r.payload);
+      setView("checkResult");
+    } else {
+      setResult(r.payload.result || r.payload);
+      setCrop(r.payload.crop ?? null);
+      setAddress(r.payload.address ? { address: r.payload.address } : null);
+      setView("result");
+    }
+    window.scrollTo(0, 0);
+  }
+
+  // 결과/살포 결과 화면의 "홈" — 기록에서 들어왔으면 기록 목록으로, 아니면 메인으로
+  function backFromResult() {
+    setView(viewingRecord ? "records" : "landing");
     window.scrollTo(0, 0);
   }
 
@@ -81,7 +106,7 @@ export default function App() {
         return <LoadingScreen crop={crop} address={address} onDone={handleLoadingDone} />;
       case "result":
         return (
-          <ResultScreen result={result} crop={crop} address={address} onCheck={goToCheckFromResult} onHome={goHome} />
+          <ResultScreen result={result} crop={crop} address={address} onCheck={goToCheckFromResult} onHome={backFromResult} />
         );
       case "check":
         return (
@@ -89,15 +114,16 @@ export default function App() {
             prefill={checkPrefill}
             onBack={goHome}
             onResult={(data) => {
+              setViewingRecord(false);
               setCheckResult(data);
               setView("checkResult");
             }}
           />
         );
       case "checkResult":
-        return <CheckResultScreen result={checkResult} onBack={goHome} />;
+        return <CheckResultScreen result={checkResult} onBack={backFromResult} />;
       case "records":
-        return <RecordsScreen onBack={goHome} />;
+        return <RecordsScreen onBack={goHome} onSelect={handleSelectRecord} />;
       default:
         return (
           <MicrobeAiLandingPage
