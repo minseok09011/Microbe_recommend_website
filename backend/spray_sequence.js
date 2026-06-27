@@ -147,19 +147,21 @@ function calcSpraySequence(materials, inoculantType, inoculantDate, currentTempC
   };
 }
 
-/* ───────────────────── 예시 ───────────────────── */
-// 농민이 6/18 구리, 6/22 트리아졸을 쳤고, 6/27에 곰팡이제(트리코더마) 접종 예정
-const example = calcSpraySequence(
-  [
-    { name: "코사이드",   appliedDate: "2026-06-18", bacteriaRisk: "🔴", fungusRisk: "🔴", family: "동제(구리)", source: "PMC10568630" },
-    { name: "오티바",     appliedDate: "2026-06-22", bacteriaRisk: "🟢", fungusRisk: "🔴", family: "스트로빌루린(QoI)", source: "PMC4286127" },
-    { name: "다트롤",     appliedDate: "2026-06-22", bacteriaRisk: "🟢", fungusRisk: "🟢", family: "살충제(비표적)" }
-  ],
-  "fungus",          // 곰팡이제(트리코더마) 접종
-  "2026-06-27",
-  11                 // 현재 기온 11℃ (저온 → 문구 발동)
-);
-console.log(JSON.stringify(example, null, 2));
+/* ───────────────────── 예시 (직접 실행 시에만: node spray_sequence.js) ───────────────────── */
+if (require.main === module) {
+  // 농민이 6/18 구리, 6/22 트리아졸을 쳤고, 6/27에 곰팡이제(트리코더마) 접종 예정
+  const example = calcSpraySequence(
+    [
+      { name: "코사이드",   appliedDate: "2026-06-18", bacteriaRisk: "🔴", fungusRisk: "🔴", family: "동제(구리)", source: "PMC10568630" },
+      { name: "오티바",     appliedDate: "2026-06-22", bacteriaRisk: "🟢", fungusRisk: "🔴", family: "스트로빌루린(QoI)", source: "PMC4286127" },
+      { name: "다트롤",     appliedDate: "2026-06-22", bacteriaRisk: "🟢", fungusRisk: "🟢", family: "살충제(비표적)" }
+    ],
+    "fungus",          // 곰팡이제(트리코더마) 접종
+    "2026-06-27",
+    11                 // 현재 기온 11℃ (저온 → 문구 발동)
+  );
+  console.log(JSON.stringify(example, null, 2));
+}
 
 // 결과 핵심:
 //   - 코사이드 해제일 6/18+14 = 7/2
