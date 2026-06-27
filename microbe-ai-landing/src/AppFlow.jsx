@@ -681,6 +681,9 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                         </h5>
                         <div className="space-y-2">
                           {vendors.slice(0, getVendorCount(i)).map((v, vi) => {
+                            const products = v.products || [
+                              { product: v.productName || v.name, price: v.price, contact: v.phone, onlineUrl: v.onlineUrl },
+                            ];
                             const productLabel = products[0]?.product
                               ? `${products[0].product}${products.length > 1 ? ` 외 ${products.length - 1}개` : ""}`
                               : "";
