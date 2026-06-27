@@ -734,6 +734,15 @@ ${candidateList}
     return JSON.parse(jsonMatch[0]);
 }
 
+// 근거 강도 등급 — 최고 유사도(topScore) 기준 임계값 매핑.
+// ⚠️ 임계값(0.72 / 0.62)은 잠정 초기값이다. 실제 점수 분포를 모르므로 응답에 raw 점수
+//    (topScore·meanTop5)도 함께 반환해, 운영자가 작물별 실제 값을 보고 나중에 조정한다.
+function gradeEvidenceConfidence(topScore) {
+    if (topScore >= 0.72) return "strong";
+    if (topScore >= 0.62) return "moderate";
+    return "weak";
+}
+
 app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
     const { crop } = req.query;
     if (!crop) return res.status(400).json({ error: "crop 파라미터가 필요합니다." });
@@ -752,12 +761,20 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
     };
 
     let queryText, sourceChunks;
+    let evidenceScore = { topScore: 0, meanTop5: 0 };
     try {
         queryText = buildQueryText(crop, data);
         const queryVector = await embedQuery(queryText);
         // 청크는 같은 논문에서 여러 개 뽑힐 수 있어, 넉넉히(24개) 검색한 뒤 논문(doi/title) 단위로
         // 중복 제거해 서로 다른 논문 8편이 들어가도록 한다 (참고문헌 중복 방지)
         const rawChunks = searchTopChunks(queryVector, 24);
+        // [근거 강도] 상위 24개 중 상위 5개 cosine score로 신뢰도 신호만 계산.
+        // 추천 로직·균종 선정에는 일절 관여하지 않고, 응답에 덧붙이기만 한다.
+        const top5Scores = rawChunks.slice(0, 5).map((c) => c.score).filter((s) => Number.isFinite(s));
+        evidenceScore = {
+            topScore: top5Scores.length ? top5Scores[0] : 0,
+            meanTop5: top5Scores.length ? top5Scores.reduce((a, b) => a + b, 0) / top5Scores.length : 0,
+        };
         const seen = new Set();
         sourceChunks = [];
         for (const c of rawChunks) {
@@ -795,7 +812,12 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
             vendorInfo: findMicrobeVendorInfo(species),
         }));
 
-        res.json({ queryText, explanation, scientificEvidence, microbes, sources });
+        // [근거 강도] 응답에 신호만 부가(추천 결과 불변). 화이트리스트 필터 후 추천 종이
+        // 비어버리면(quota 아님) 근거 부족의 강한 신호이므로 weak로 강제한다.
+        let evidenceConfidence = gradeEvidenceConfidence(evidenceScore.topScore);
+        if (microbes.length === 0) evidenceConfidence = "weak";
+
+        res.json({ queryText, explanation, scientificEvidence, microbes, sources, evidenceConfidence, evidenceScore });
     } catch (error) {
         console.error("❌ 미생물 추천(LLM) 에러:", error.message);
         if (error.quotaExceeded) {
@@ -806,6 +828,8 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
                 microbes: [],
                 sources,
                 quotaExceeded: true,
+                evidenceConfidence: "weak",
+                evidenceScore,
             });
         }
         res.status(500).json({ error: "미생물 추천 중 에러 발생: " + error.message });
