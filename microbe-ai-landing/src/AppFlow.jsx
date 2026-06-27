@@ -17,6 +17,7 @@ import {
   CloudRain,
   Sun,
   ChevronDown,
+  Lightbulb,
 } from "lucide-react";
 import { CROPS, LOAD_STEPS, delay, searchAddress, fetchRecommend, searchSprayMaterials, fetchSpraySequence } from "./data.js";
 import SaveRecordButton from "./SaveRecordButton.jsx";
@@ -439,9 +440,11 @@ function SoilInfoPanel({ soilInfo }) {
 export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const [showAll, setShowAll] = useState(false);
   const [showSoilInfo, setShowSoilInfo] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const [vendorCounts, setVendorCounts] = useState({});
   const getVendorCount = (i) => vendorCounts[i] ?? 3;
   const showMoreVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: getVendorCount(i) + 5 }));
+  const collapseVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: 3 }));
   const cropName = CROPS.find((c) => c.id === crop)?.name || crop || "";
   const addrName = address?.address || address?.roadAddr || address?.jibunAddr || "입력 주소";
 
@@ -510,6 +513,22 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
             <span aria-hidden="true">{confidenceBadge.icon}</span>
             <span>{confidenceBadge.label}</span>
           </div>
+        )}
+
+        {/* 상황 설명 (백엔드 explanation) — 가장 위에서 먼저 보여줌 */}
+        {explanation && (
+          <Reveal>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-3 text-sm text-emerald-900">
+              <p className="font-bold mb-1.5">🔍 상황 설명</p>
+              <p className={`leading-relaxed ${showExplanation ? "" : "line-clamp-4"}`}>{explanation}</p>
+              <button
+                onClick={() => setShowExplanation((v) => !v)}
+                className="mt-2 text-xs font-semibold text-emerald-700 underline"
+              >
+                {showExplanation ? "접기" : "자세히 보기"}
+              </button>
+            </div>
+          </Reveal>
         )}
 
         {/* 토양 데이터 출처 안내 (백엔드 soilDataSource) */}
@@ -632,9 +651,18 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                       </div>
                     )}
 
-                    {(m.description || m.reason || m.effect) && (
+                    {m.reason && (
+                      <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-900 text-xs px-3 py-2.5 mb-3.5 leading-relaxed">
+                        <Lightbulb className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="font-bold">AI 선정 이유</strong> — {m.reason}
+                        </span>
+                      </div>
+                    )}
+
+                    {(m.description || m.effect) && (
                       <p className="text-sm text-stone-700 leading-relaxed mb-3.5">
-                        {m.description || m.reason || m.effect}
+                        {m.description || m.effect}
                       </p>
                     )}
 
@@ -716,13 +744,25 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                           })}
                         </div>
 
-                        {vendors.length > getVendorCount(i) && (
-                          <button
-                            onClick={() => showMoreVendors(i)}
-                            className="mt-2 w-full rounded-md border border-stone-300 py-2 text-xs font-semibold text-stone-600 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
-                          >
-                            판매처 더보기 (+{Math.min(5, vendors.length - getVendorCount(i))})
-                          </button>
+                        {(vendors.length > getVendorCount(i) || getVendorCount(i) > 3) && (
+                          <div className="mt-2 flex gap-2">
+                            {vendors.length > getVendorCount(i) && (
+                              <button
+                                onClick={() => showMoreVendors(i)}
+                                className="flex-1 rounded-md border border-stone-300 py-2 text-xs font-semibold text-stone-600 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
+                              >
+                                판매처 더보기 (+{Math.min(5, vendors.length - getVendorCount(i))})
+                              </button>
+                            )}
+                            {getVendorCount(i) > 3 && (
+                              <button
+                                onClick={() => collapseVendors(i)}
+                                className="flex-1 rounded-md border border-stone-300 py-2 text-xs font-semibold text-stone-600 hover:border-stone-400 transition-colors"
+                              >
+                                접기
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -740,14 +780,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
           >
             추천 {microbes.length}개 모두 보기 (상세보기)
           </button>
-        )}
-
-        {explanation && (
-          <Reveal>
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-3 text-sm text-emerald-900 leading-relaxed">
-              🔬 {explanation}
-            </div>
-          </Reveal>
         )}
 
         {/* 논문 근거 더보기 (백엔드 scientificEvidence + sources) */}

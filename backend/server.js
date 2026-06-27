@@ -701,7 +701,10 @@ ${candidateList}
 
 다음 JSON 형식으로만 답변하세요 (다른 텍스트 없이):
 {
-  "recommendedSpecies": ["학명1", "학명2"],
+  "recommendedSpecies": [
+    { "species": "학명1", "reason": "이 미생물을 선정한 구체적 이유. 위 농경지 수치(산도/유기물/영양분 등)와 직접 연결지어, 농사 짓는 분이 이해할 수 있는 말투로 2~3문장." },
+    { "species": "학명2", "reason": "..." }
+  ],
   "explanation": "전문 용어와 논문 인용 없이, 농사 짓는 분이 바로 이해할 수 있는 쉽고 친근한 말투의 한국어로 작성. (1) 이 농경지의 토양 상태(산도, 유기물, 영양분 등)가 작물 재배에 어떤 의미인지 일상적인 표현으로 설명하고, (2) 추천한 미생물이 구체적으로 어떤 효능이 있어서 이 토양과 작물에 도움이 되는지 설명. 4~6문장.",
   "scientificEvidence": "위 추천의 과학적 근거를 위 논문 발췌를 인용([1], [2] 등)하며 전문적으로 설명. 3~5문장."
 }`;
@@ -800,16 +803,18 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
         const scientificEvidence = result.scientificEvidence;
         let recommendedSpecies = Array.isArray(result.recommendedSpecies) ? result.recommendedSpecies : [];
 
-        // 출력 검증: (1) 속 단위(sp./spp.) 표기 제거, (2) 후보 목록(닫힌집합) 밖이면 제거
-        recommendedSpecies = recommendedSpecies.filter((sp) => {
-            const key = canonicalSpeciesKey(sp);
+        // 출력 검증: (1) 형식 누락 제거, (2) 속 단위(sp./spp.) 표기 제거, (3) 후보 목록(닫힌집합) 밖이면 제거
+        recommendedSpecies = recommendedSpecies.filter((item) => {
+            const species = item?.species;
+            const key = canonicalSpeciesKey(species);
             if (!key || key.endsWith(" sp.")) return false; // 종 미특정 표기 차단
             return candidateKeySet.has(key); // 48종(토양추천 시 26종) 화이트리스트 내만 허용
         });
 
-        const microbes = recommendedSpecies.map((species) => ({
-            species,
-            vendorInfo: findMicrobeVendorInfo(species),
+        const microbes = recommendedSpecies.map((item) => ({
+            species: item.species,
+            reason: item.reason || "",
+            vendorInfo: findMicrobeVendorInfo(item.species),
         }));
 
         // [근거 강도] 응답에 신호만 부가(추천 결과 불변). 화이트리스트 필터 후 추천 종이

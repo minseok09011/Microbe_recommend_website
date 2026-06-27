@@ -104,7 +104,6 @@ function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, on
   const stats = [
     { value: "1,764편", label: "A급 논문 학습" },
     { value: "27종", label: "토양 상세 데이터 반영" },
-    { value: "100%", label: "날씨 기반 살포 신호등" },
   ];
 
   return (
