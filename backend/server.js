@@ -10,6 +10,7 @@ const express = require("express");
 const cors = require("cors");
 const proj4 = require("proj4");
 const { parse: parseCsv } = require("csv-parse/sync");
+const { calcSpraySequence } = require("./spray_sequence"); // 살포 시퀀스 계산 엔진(검증 완료, 수정 금지)
 
 // 농림수산식품교육문화정보원 팜맵 API가 쓰는 좌표계 (EPSG:5179, GRS80 중부원점)
 const KOREA_5179 = "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs";
@@ -28,6 +29,9 @@ app.use(
         origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : "*",
     })
 );
+
+// POST /api/spraySequence 등에서 JSON 본문을 읽기 위한 파서
+app.use(express.json({ limit: "256kb" }));
 
 // ── [#3] 간단 rate limit (IP당 1분 30회) — 무료 쿼터(Voyage·Gemini·공공데이터) 소진 방지 ──
 const rateBucket = new Map(); // ip -> { count, resetAt }
@@ -266,6 +270,99 @@ const SPECIES_SYNONYMS = {
     "latilactobacillus sakei": "lactobacillus sakei",
     "bacillus polymyxa": "paenibacillus polymyxa", // 1993년 Paenibacillus 속이 분리되기 전 옛 이름
 };
+
+// ================================================================
+// 🗓️ 살포 시퀀스 — 농약/친환경 위험표 + 비료·소독제 종류룰 + 균종 분류
+// ================================================================
+const PESTICIDE_RISK_PATH = path.join(__dirname, "pesticide_risk.csv");
+const ECO_RISK_PATH = path.join(__dirname, "eco_risk.csv");
+
+let pesticideRiskByName = new Map(); // 소문자 상표명 -> { name, b, f, family, generic }
+let ecoRiskByName = new Map(); // 소문자 자재명 -> { name, b, f, family }
+let sprayMaterialList = []; // 자동완성용 [{ name, type, family }]
+
+const VALID_RISK = new Set(["🔴", "🟡", "🟢"]);
+const sanitizeRisk = (r) => (VALID_RISK.has((r || "").trim()) ? (r || "").trim() : "🟡"); // 깨진 값은 안전쪽(주의)으로
+
+// 비료·소독제는 제품DB가 없어 종류룰(상수)로 처리한다.
+// ⚠️ spray_sequence.js 의 TYPE_RULES 를 그대로 반영한 사본이다(엔진은 수정 금지라 export 불가).
+//    엔진의 TYPE_RULES 가 바뀌면 이 표도 같이 맞춰야 한다.
+const SPRAY_TYPE_RULES = {
+    fert_nitrogen: { b: "🟡", f: "🟡", family: "질소·칼리·복합비료" },
+    fert_lime: { b: "🟡", f: "🟡", family: "석회·규산·고토" },
+    fert_rawmanure: { b: "🟡", f: "🟡", family: "미부숙 가축분" },
+    fert_compost: { b: "🟢", f: "🟢", family: "완숙퇴비·유기질·미생물" },
+    fert_nutrient: { b: "🟢", f: "🟢", family: "영양제·미량요소" },
+    fert_cyanamide: { b: "🔴", f: "🔴", family: "석회질소(예외)" },
+    disinf_oxidizer: { b: "🔴", f: "🔴", family: "산화제계(과산화수소·과산화초산)" },
+    disinf_chlorine: { b: "🔴", f: "🔴", family: "염소계(차아염소산·이산화염소)" },
+    microbe: { b: "🟢", f: "🟢", family: "미생물 약제" },
+    none: { b: "🟢", f: "🟢", family: "없음" },
+};
+
+function loadSprayRiskTables() {
+    const loadFile = (filePath, type, targetMap) => {
+        let csvText = fs.readFileSync(filePath, "utf-8");
+        if (csvText.charCodeAt(0) === 0xfeff) csvText = csvText.slice(1);
+        const rows = parseCsv(csvText, { columns: true, skip_empty_lines: true, relax_column_count: true });
+        let n = 0;
+        for (const row of rows) {
+            const name = (row["상표명"] || "").trim();
+            if (!name) continue;
+            const entry = {
+                name,
+                type,
+                b: sanitizeRisk(row["세균제위험"]),
+                f: sanitizeRisk(row["곰팡이제위험"]),
+                family: (row["계열"] || "").trim(),
+                generic: (row["일반명"] || "").trim(), // 친환경표엔 없음 → ""
+            };
+            const key = name.toLowerCase();
+            if (!targetMap.has(key)) targetMap.set(key, entry); // 동일 표 내 중복은 첫 행 채택
+            sprayMaterialList.push({ name, type, family: entry.family });
+            n++;
+        }
+        return n;
+    };
+    const p = loadFile(PESTICIDE_RISK_PATH, "pesticide", pesticideRiskByName);
+    const e = loadFile(ECO_RISK_PATH, "eco", ecoRiskByName);
+    console.log(`🧪 살포 위험표 로드 완료: 농약 ${p}건 + 친환경 ${e}건`);
+}
+
+// 상표명 → 위험값 {b, f, family}. kind 우선, 없으면 양쪽 표를 다 뒤지고, 그래도 없으면 null.
+function lookupMaterialRisk(name, kind) {
+    const key = (name || "").trim().toLowerCase();
+    if (!key) return null;
+    if (kind === "type") return SPRAY_TYPE_RULES[name] ? { ...SPRAY_TYPE_RULES[name] } : null;
+    if (kind === "pesticide" && pesticideRiskByName.has(key)) return pesticideRiskByName.get(key);
+    if (kind === "eco" && ecoRiskByName.has(key)) return ecoRiskByName.get(key);
+    // kind 불명확/엇갈림 → 농약 → 친환경 → 종류룰 순서로 폴백
+    return pesticideRiskByName.get(key) || ecoRiskByName.get(key) || (SPRAY_TYPE_RULES[name] ? { ...SPRAY_TYPE_RULES[name] } : null);
+}
+
+// 미생물 학명의 속(genus)으로 세균제/곰팡이제 판정. 모르면 "both"(보수적).
+const BACTERIA_GENERA = new Set([
+    "bacillus", "paenibacillus", "pseudomonas", "lactobacillus", "lactiplantibacillus", "lacticaseibacillus",
+    "limosilactobacillus", "latilactobacillus", "priestia", "streptomyces", "azospirillum", "rhizobium",
+    "bradyrhizobium", "sinorhizobium", "mesorhizobium", "azotobacter", "burkholderia", "paraburkholderia",
+    "serratia", "lysobacter", "enterobacter", "klebsiella", "gluconacetobacter", "acetobacter", "nitrobacter",
+    "nitrosomonas", "rhodopseudomonas", "rhodobacter", "micrococcus", "arthrobacter", "agrobacterium",
+]);
+const FUNGUS_GENERA = new Set([
+    "trichoderma", "beauveria", "metarhizium", "glomus", "funneliformis", "rhizophagus", "claroideoglomus",
+    "paecilomyces", "purpureocillium", "aspergillus", "penicillium", "clonostachys", "gliocladium",
+    "coniothyrium", "ampelomyces", "lecanicillium", "verticillium", "isaria", "cordyceps", "pochonia",
+    "saccharomyces", "candida", "pichia", "aureobasidium", "talaromyces",
+]);
+
+function classifyInoculantSpecies(speciesName) {
+    const key = canonicalSpeciesKey(speciesName); // "genus species" (소문자)
+    if (!key) return "both";
+    const genus = key.split(" ")[0];
+    if (BACTERIA_GENERA.has(genus)) return "bacteria";
+    if (FUNGUS_GENERA.has(genus)) return "fungus";
+    return "both"; // 매칭 안 되면 보수적으로 둘 다
+}
 
 // 2020년 Bacillus·Lactobacillus 속이 여러 속으로 대거 재분류되면서(예: Bacillus →
 // Priestia/Peribacillus/Niallia 등, Lactobacillus → Lactiplantibacillus/
@@ -984,8 +1081,101 @@ app.get("/api/getMergedData", rateLimit, async (req, res) => {
     }
 });
 
+// ── 살포 자재 자동완성 ──────────────────────────────────────────
+// GET /api/sprayMaterials?q=검색어&limit=10
+// 농약+친환경 상표명에서 q 포함 항목을 앞글자 우선으로 정렬해 반환.
+app.get("/api/sprayMaterials", rateLimit, (req, res) => {
+    const q = (req.query.q || "").trim();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 30);
+    if (!q) return res.json([]);
+
+    const ql = q.toLowerCase();
+    const starts = [];
+    const contains = [];
+    for (const e of sprayMaterialList) {
+        const idx = e.name.toLowerCase().indexOf(ql);
+        if (idx === 0) starts.push(e);
+        else if (idx > 0) contains.push(e);
+    }
+    const seen = new Set();
+    const out = [];
+    for (const e of starts.concat(contains)) {
+        if (seen.has(e.name)) continue; // 같은 이름 중복 제거
+        seen.add(e.name);
+        out.push({ name: e.name, type: e.type, family: e.family });
+        if (out.length >= limit) break;
+    }
+    res.json(out);
+});
+
+// ── 살포 시퀀스 계산 ────────────────────────────────────────────
+// POST /api/spraySequence
+// body: { materials:[{kind,name,appliedDate}], inoculantType, inoculantSpecies?,
+//         inoculantDate?, lat?, lng?, obsrSpotCd? }
+app.post("/api/spraySequence", rateLimit, async (req, res) => {
+    try {
+        const body = req.body || {};
+        const inputMaterials = Array.isArray(body.materials) ? body.materials : [];
+        const validMaterials = inputMaterials.filter((m) => m && (m.name || "").trim() && (m.appliedDate || "").trim());
+        if (validMaterials.length === 0) {
+            return res.status(400).json({ error: "자재 이름과 살포일을 1건 이상 입력해주세요." });
+        }
+
+        // 균종: 학명이 오면 자동 판정으로 inoculantType 덮어쓰기
+        let inoculantType = body.inoculantType;
+        if (body.inoculantSpecies && body.inoculantSpecies.trim()) {
+            inoculantType = classifyInoculantSpecies(body.inoculantSpecies);
+        }
+        if (!["bacteria", "fungus", "both"].includes(inoculantType)) inoculantType = "both";
+
+        // 각 자재를 위험값으로 변환 (못 찾으면 보수적으로 🟡/🟡 + 미확인)
+        const unmatchedMaterials = [];
+        const materials = validMaterials.map((m) => {
+            const name = (m.name || "").trim();
+            const risk = lookupMaterialRisk(name, m.kind);
+            if (!risk) {
+                unmatchedMaterials.push(name);
+                return { name, appliedDate: m.appliedDate.trim(), bacteriaRisk: "🟡", fungusRisk: "🟡", family: "미확인", source: null };
+            }
+            return {
+                name,
+                appliedDate: m.appliedDate.trim(),
+                bacteriaRisk: sanitizeRisk(risk.b),
+                fungusRisk: sanitizeRisk(risk.f),
+                family: risk.family || "",
+                source: risk.source || null,
+            };
+        });
+
+        // 현재 기온: obsrSpotCd 있으면 농업기상 10분자료에서 1개 추출(실패해도 무시)
+        let currentTempC = null;
+        if (body.obsrSpotCd) {
+            try {
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+                const hourStr = String(now.getHours()).padStart(2, "0");
+                const w = await fetchAgriTenMinWeather(body.obsrSpotCd, dateStr, hourStr);
+                if (w && Number.isFinite(w.airTemp)) currentTempC = w.airTemp;
+            } catch (e) {
+                currentTempC = null; // 기온 못 받아도 계산은 진행
+            }
+        }
+
+        const inoculantDate = (body.inoculantDate || "").trim() || undefined;
+        const result = calcSpraySequence(materials, inoculantType, inoculantDate, currentTempC);
+        result.inoculantType = inoculantType; // UI 안내용으로 확정된 균종 종류를 함께 반환
+        if (unmatchedMaterials.length) result.unmatchedMaterials = unmatchedMaterials;
+
+        res.json(result);
+    } catch (error) {
+        console.error("❌ 살포 시퀀스 에러:", error);
+        res.status(500).json({ error: "살포 시퀀스 계산 중 서버 에러: " + error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`✅ 백엔드 서버 실행 중: http://localhost:${PORT}`);
     loadPaperIndex();
     loadMicrobeDisclosure();
+    loadSprayRiskTables();
 });
