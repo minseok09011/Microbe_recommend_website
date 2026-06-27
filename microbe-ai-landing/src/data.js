@@ -182,6 +182,10 @@ export async function fetchRecommend(crop, address) {
     // (결과 화면 "내 토양 정보 보기"에서 그대로 표시)
     return {
       ...rec,
+      // 근거 강도 신호 패스스루(백엔드 /api/recommendMicrobe 응답). ...rec로 이미 실려오지만
+      // 결과 화면이 의존하므로 명시적으로 둔다.
+      evidenceConfidence: rec.evidenceConfidence,
+      evidenceScore: rec.evidenceScore,
       soilDataSource: env.soilDataSource,
       isFarmland: env.isFarmland,
       landUseType: env.landUseType,

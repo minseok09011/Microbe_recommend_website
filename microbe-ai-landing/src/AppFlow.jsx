@@ -466,6 +466,18 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const scientificEvidence = result.scientificEvidence || "";
   const sources = Array.isArray(result.sources) ? result.sources : [];
 
+  // 근거 신뢰도 배지(중립적 톤, 수치 표기 없음). 알 수 없는 값이면 배지 생략.
+  const CONFIDENCE_BADGE = {
+    strong: { icon: "🟢", label: "직접 근거 기반 추천", cls: "bg-emerald-50 border-emerald-200 text-emerald-800" },
+    moderate: { icon: "🟡", label: "참고 근거 기반 추천", cls: "bg-amber-50 border-amber-200 text-amber-800" },
+    weak: { icon: "⚪", label: "일반적 대안 제시", cls: "bg-stone-100 border-stone-300 text-stone-600" },
+  };
+  const confidenceBadge = CONFIDENCE_BADGE[result.evidenceConfidence];
+  // 보편 대안 안내: 근거가 약하거나(weak) 추천 종이 비었을 때. 단, 쿼터 초과로 비는 경우는
+  // 별도 한도 안내가 이미 있고 "보편 미생물 제안"이 사실과 달라지므로 제외한다.
+  const showUniversalNotice =
+    !result.quotaExceeded && (result.evidenceConfidence === "weak" || microbes.length === 0);
+
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       <TopBar title="추천 결과" onBack={onHome} backLabel="홈" />
@@ -491,6 +503,14 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
             </div>
           </div>
         </Reveal>
+
+        {/* 근거 신뢰도 배지 (백엔드 evidenceConfidence) */}
+        {confidenceBadge && (
+          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold mb-3 ${confidenceBadge.cls}`}>
+            <span aria-hidden="true">{confidenceBadge.icon}</span>
+            <span>{confidenceBadge.label}</span>
+          </div>
+        )}
 
         {/* 토양 데이터 출처 안내 (백엔드 soilDataSource) */}
         {result.soilDataSource === "전국 평균값" && (
@@ -532,6 +552,13 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
         {result.quotaExceeded && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-3 text-xs text-amber-800 leading-relaxed">
             ⚠️ 현재 AI 무료 사용량 한도에 도달해 추천 균종 목록이 비어 있을 수 있어요. 잠시 후 다시 시도해주세요.
+          </div>
+        )}
+
+        {/* 보편 대안 안내 (근거 약함/추천 종 없음) — 추천 카드 위 */}
+        {showUniversalNotice && (
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 mb-3 text-xs text-stone-600 leading-relaxed">
+            ℹ️ 이 작물·환경에 직접 부합하는 연구 근거가 충분하지 않아, 토양·작물에 일반적으로 유익한 보편 미생물을 제안합니다. 특정 목적에 최적화된 추천이 아닐 수 있어요.
           </div>
         )}
 
