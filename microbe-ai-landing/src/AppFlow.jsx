@@ -469,17 +469,12 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const scientificEvidence = result.scientificEvidence || "";
   const sources = Array.isArray(result.sources) ? result.sources : [];
 
-  // 근거 신뢰도 배지(중립적 톤, 수치 표기 없음). 알 수 없는 값이면 배지 생략.
-  const CONFIDENCE_BADGE = {
-    strong: { icon: "🟢", label: "직접 근거 기반 추천", cls: "bg-emerald-50 border-emerald-200 text-emerald-800" },
-    moderate: { icon: "🟡", label: "참고 근거 기반 추천", cls: "bg-amber-50 border-amber-200 text-amber-800" },
-    weak: { icon: "⚪", label: "일반적 대안 제시", cls: "bg-stone-100 border-stone-300 text-stone-600" },
-  };
-  const confidenceBadge = CONFIDENCE_BADGE[result.evidenceConfidence];
-  // 보편 대안 안내: 근거가 약하거나(weak) 추천 종이 비었을 때. 단, 쿼터 초과로 비는 경우는
-  // 별도 한도 안내가 이미 있고 "보편 미생물 제안"이 사실과 달라지므로 제외한다.
-  const showUniversalNotice =
-    !result.quotaExceeded && (result.evidenceConfidence === "weak" || microbes.length === 0);
+  // 근거 강도/토양 출처는 "꽉 찬 별"만으로 표시(빈 별 ☆ 안 씀). 값이 없으면 항목 생략(안전).
+  const EVIDENCE_STARS = { strong: "★★★★★", moderate: "★★★★", weak: "★★★" };
+  const evidenceStars = EVIDENCE_STARS[result.evidenceConfidence];
+  const topScore = result?.evidenceScore?.topScore;
+  const SOIL_STARS = { "실측값": "★★★★★", "지역 추정값": "★★★★", "전국 평균값": "★★★" };
+  const soilStars = SOIL_STARS[result.soilDataSource];
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
@@ -507,15 +502,27 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
           </div>
         </Reveal>
 
-        {/* 근거 신뢰도 배지 (백엔드 evidenceConfidence) */}
-        {confidenceBadge && (
-          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold mb-3 ${confidenceBadge.cls}`}>
-            <span aria-hidden="true">{confidenceBadge.icon}</span>
-            <span>{confidenceBadge.label}</span>
+        {/* 토양 데이터 출처 안내 (백엔드 soilDataSource) — 상황 설명 위에 먼저, 별점과 함께 */}
+        {result.soilDataSource === "전국 평균값" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-3 text-xs text-amber-800 leading-relaxed">
+            <span className="text-amber-500 mr-1">{soilStars}</span>
+            ℹ️ 이 주소의 실측·지역 토양 데이터가 없어 <strong>전국 평균값</strong>으로 추천했어요. 정확한 농경지 지번 주소를 입력하면 실측값 기준으로 더 정확해집니다.
+          </div>
+        )}
+        {result.soilDataSource === "지역 추정값" && (
+          <div className="bg-stone-100 rounded-2xl p-3.5 mb-3 text-xs text-stone-600 leading-relaxed">
+            <span className="text-amber-500 mr-1">{soilStars}</span>
+            📊 이 농경지의 실측 기록이 없어, <strong>해당 지역(법정동) 토양 통계</strong>로 추정한 값을 기준으로 추천했어요.
+          </div>
+        )}
+        {result.soilDataSource === "실측값" && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3.5 mb-3 text-xs text-emerald-800 leading-relaxed">
+            <span className="text-amber-500 mr-1">{soilStars}</span>
+            🛰️ 이 농경지의 <strong>실측 토양검정 데이터</strong>를 기준으로 추천했어요.
           </div>
         )}
 
-        {/* 상황 설명 (백엔드 explanation) — 가장 위에서 먼저 보여줌 */}
+        {/* 상황 설명 (백엔드 explanation) */}
         {explanation && (
           <Reveal>
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-3 text-sm text-emerald-900">
@@ -529,23 +536,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
               </button>
             </div>
           </Reveal>
-        )}
-
-        {/* 토양 데이터 출처 안내 (백엔드 soilDataSource) */}
-        {result.soilDataSource === "전국 평균값" && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-3 text-xs text-amber-800 leading-relaxed">
-            ℹ️ 이 주소의 실측·지역 토양 데이터가 없어 <strong>전국 평균값</strong>으로 추천했어요. 정확한 농경지 지번 주소를 입력하면 실측값 기준으로 더 정확해집니다.
-          </div>
-        )}
-        {result.soilDataSource === "지역 추정값" && (
-          <div className="bg-stone-100 rounded-2xl p-3.5 mb-3 text-xs text-stone-600 leading-relaxed">
-            📊 이 농경지의 실측 기록이 없어, <strong>해당 지역(법정동) 토양 통계</strong>로 추정한 값을 기준으로 추천했어요.
-          </div>
-        )}
-        {result.soilDataSource === "실측값" && (
-          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3.5 mb-3 text-xs text-emerald-800 leading-relaxed">
-            🛰️ 이 농경지의 <strong>실측 토양검정 데이터</strong>를 기준으로 추천했어요.
-          </div>
         )}
 
         {/* 내 토양 정보 보기 (백엔드 soilInfo) */}
@@ -571,13 +561,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
         {result.quotaExceeded && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-3 text-xs text-amber-800 leading-relaxed">
             ⚠️ 현재 AI 무료 사용량 한도에 도달해 추천 균종 목록이 비어 있을 수 있어요. 잠시 후 다시 시도해주세요.
-          </div>
-        )}
-
-        {/* 보편 대안 안내 (근거 약함/추천 종 없음) — 추천 카드 위 */}
-        {showUniversalNotice && (
-          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 mb-3 text-xs text-stone-600 leading-relaxed">
-            ℹ️ 이 작물·환경에 직접 부합하는 연구 근거가 충분하지 않아, 토양·작물에 일반적으로 유익한 보편 미생물을 제안합니다. 특정 목적에 최적화된 추천이 아닐 수 있어요.
           </div>
         )}
 
@@ -788,6 +771,13 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
             <summary className="cursor-pointer text-sm font-semibold text-stone-900 select-none">
               📄 더보기 — 논문 근거로 살펴보기
             </summary>
+            {evidenceStars && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-sm font-bold text-stone-900">논문 근거 강도</span>
+                <span className="text-amber-500 text-base leading-none tracking-tight" aria-label={`근거 강도 ${result.evidenceConfidence}`}>{evidenceStars}</span>
+                {Number.isFinite(topScore) && <span className="text-xs text-stone-400">(유사도 {topScore.toFixed(2)})</span>}
+              </div>
+            )}
             {scientificEvidence && (
               <p className="mt-3 text-sm text-stone-700 leading-relaxed">{scientificEvidence}</p>
             )}
