@@ -497,12 +497,12 @@ function ServiceShowcase() {
             </div>
           </div>
 
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <h3 className="text-lg font-bold text-stone-900 mb-2">{slides[current].title}</h3>
             <p className="text-sm text-stone-500 leading-relaxed max-w-md mx-auto">{slides[current].desc}</p>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mt-8">
+          <div className="flex items-center justify-center gap-4 mt-4">
               <button
                 onClick={() => goTo((current - 1 + slides.length) % slides.length)}
                 className="w-10 h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center text-stone-500 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
