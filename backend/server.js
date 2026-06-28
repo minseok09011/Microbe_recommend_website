@@ -484,24 +484,38 @@ function loadMicrobeDisclosure() {
     console.log(`🏪 미생물 공시현황 판매처 정보 로드 완료: ${disclosureByKey.size}종 / 원본 ${rows.length}건 / 검색 항목 ${microbeSearchList.length}건`);
 }
 
-// 추천 후보로 줄 학명 목록(닫힌집합). 토양추천에는 토양개량/생장촉진 기능 종만 쓰고,
-// 그런 종이 없으면(데이터 누락 대비) 판매처 있는 전체 종으로 폴백한다.
+// 추천 목적 → 기능태그(닫힌집합). general은 전체.
+// 기능태그는 microbe_disclosure.csv의 `기능태그` 컬럼에서 이미 채워져 있다(CSV 불변).
+const PURPOSES = {
+    soil:    { label: "생육·토양",  tags: ["soil_improvement"] },
+    disease: { label: "병해 억제",  tags: ["biocontrol_disease", "biocontrol_both"] },
+    pest:    { label: "해충 억제",  tags: ["biocontrol_insect",  "biocontrol_both"] },
+    general: { label: "전반 추천",  tags: null },   // 목적 필터 없음(전체 종)
+};
+function purposeLabel(p) { return (PURPOSES[p] || PURPOSES.general).label; }
+
+// 추천 후보로 줄 학명 목록(닫힌집합). 목적에 맞는 기능태그 종만 쓰고,
+// 그런 종이 없으면(데이터 누락 대비) 판매처 있는 전체 종으로 폴백한다(범용 폴백).
+// 작물-제품 매핑이 라이브 데이터에 없어 작물별 목적 게이팅은 하지 않는다.
 // 반환: 학술표기("Bacillus subtilis") 배열
-function getRecommendableSpecies(soilOnly = true) {
+function getRecommendableSpecies(purpose = "soil") {
+    const tags = (PURPOSES[purpose] || PURPOSES.general).tags;
     const all = [];
-    const soil = [];
+    const filtered = [];
     for (const [key, entry] of disclosureByKey.entries()) {
         if (key.endsWith(" sp.")) continue; // 속 단위 키는 후보에서 제외
         all.push(entry.displayName);
-        if (entry.funcTags && entry.funcTags.has("soil_improvement")) soil.push(entry.displayName);
+        if (tags && entry.funcTags && tags.some((t) => entry.funcTags.has(t))) {
+            filtered.push(entry.displayName);
+        }
     }
-    const list = soilOnly && soil.length > 0 ? soil : all;
+    const list = tags && filtered.length > 0 ? filtered : all; // 목적 종 없으면 범용 폴백
     return list.sort();
 }
 
 // canonicalSpeciesKey로 정규화한 추천 후보 키 집합(출력 검증용)
-function getRecommendableKeySet(soilOnly = true) {
-    return new Set(getRecommendableSpecies(soilOnly).map((s) => canonicalSpeciesKey(s)));
+function getRecommendableKeySet(purpose = "soil") {
+    return new Set(getRecommendableSpecies(purpose).map((s) => canonicalSpeciesKey(s)));
 }
 
 function findMicrobeVendorInfo(speciesName) {
@@ -597,7 +611,15 @@ function classify(value, midpoints, labels) {
     return labels[nearestIdx];
 }
 
-function buildQueryText(crop, data) {
+// 목적별 질의 꼬리 — 생육·토양 편향을 막고 목적에 맞는 논문 청크가 잘 검색되게 한다.
+const PURPOSE_QUERY_TAIL = {
+    soil:    "looking for plant growth-promoting rhizobacteria for nutrient solubilization and soil health",
+    disease: "looking for biocontrol microorganisms antagonistic to soil-borne plant pathogens (disease suppression, antifungal)",
+    pest:    "looking for entomopathogenic fungi and nematodes for microbial insect pest control",
+    general: "looking for beneficial soil microbes (plant growth-promoting bacteria/fungi) suited to these conditions",
+};
+
+function buildQueryText(crop, data, purpose = "soil") {
     const cat = fieldTypeOf(crop);
     const parts = [`${crop} cultivation soil`];
 
@@ -626,7 +648,7 @@ function buildQueryText(crop, data) {
     if (data.airTemp !== undefined) parts.push(`air temperature ${data.airTemp}°C`);
     if (data.rain !== undefined && data.rain > 0) parts.push(`recent rainfall ${data.rain}mm`);
 
-    parts.push("looking for beneficial soil microbes (plant growth-promoting bacteria/fungi) suited to these conditions");
+    parts.push(PURPOSE_QUERY_TAIL[purpose] || PURPOSE_QUERY_TAIL.general);
 
     return parts.join(", ");
 }
@@ -729,7 +751,7 @@ function parseLlmJson(raw) {
     return JSON.parse(cleaned);
 }
 
-async function generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies) {
+async function generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies, purpose = "soil") {
     const sourcesText = sourceChunks
         .map((c, i) => `[${i + 1}] ${c.title} (${c.journal}, ${c.year})\n${c.text.slice(0, 800)}`)
         .join("\n\n");
@@ -739,6 +761,7 @@ async function generateRecommendation(crop, data, queryText, sourceChunks, candi
     const prompt = `당신은 농업 미생물 전문가입니다. 아래 농경지 환경 데이터와 관련 논문 발췌문을 보고, 이 농경지에 가장 적합한 미생물을 추천해주세요.
 
 [작물] ${crop}
+[추천 목적] ${purposeLabel(purpose)} — 이 목적에 부합하는 미생물을 우선 선정한다.
 [농경지 수치] ${farmStatsKorean}
 [환경 데이터 요약] ${queryText}
 
@@ -808,6 +831,7 @@ function gradeEvidenceConfidence(topScore) {
 
 app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
     const { crop } = req.query;
+    const purpose = req.query.purpose || "soil"; // 프론트 미전송 시 기존 동작(soil) 유지
     if (!crop) return res.status(400).json({ error: "crop 파라미터가 필요합니다." });
     if (!paperVectors) return res.status(503).json({ error: "논문 인덱스가 아직 로딩되지 않았습니다." });
 
@@ -826,7 +850,7 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
     let queryText, sourceChunks;
     let evidenceScore = { topScore: 0, meanTop5: 0 };
     try {
-        queryText = buildQueryText(crop, data);
+        queryText = buildQueryText(crop, data, purpose);
         const queryVector = await embedQuery(queryText);
         // 청크는 같은 논문에서 여러 개 뽑힐 수 있어, 넉넉히(24개) 검색한 뒤 논문(doi/title) 단위로
         // 중복 제거해 서로 다른 논문 8편이 들어가도록 한다 (참고문헌 중복 방지)
@@ -855,8 +879,8 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
     const sources = sourceChunks.map((c) => ({ title: c.title, journal: c.journal, year: c.year, doi: c.doi }));
 
     try {
-        const candidateSpecies = getRecommendableSpecies(true); // 토양추천: soil_improvement 종 우선
-        const candidateKeySet = getRecommendableKeySet(true);
+        const candidateSpecies = getRecommendableSpecies(purpose); // 목적별 후보 종(범용 폴백)
+        const candidateKeySet = getRecommendableKeySet(purpose);
 
         // Gemini가 가끔 깨진 JSON을 주므로, 파싱 실패 시 최대 2회까지 재생성한다.
         // (정상 JSON은 첫 시도에 통과 — 기존 동작 영향 없음)
@@ -865,7 +889,7 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
         const MAX_ATTEMPTS = 3; // 최초 1회 + 재시도 2회
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                result = await generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies);
+                result = await generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies, purpose);
                 break;
             } catch (e) {
                 if (e.parseFailed) {
