@@ -30,6 +30,7 @@ export default function LoginScreen({ onBack, onLogin }) {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0); // 인증번호 재전송까지 남은 초
 
   useEffect(() => {
     function onKey(e) {
@@ -39,10 +40,18 @@ export default function LoginScreen({ onBack, onLogin }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onBack]);
 
+  // 재전송 쿨다운 1초씩 감소
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resendCooldown]);
+
   function switchMode(next) {
     setView(next);
     setError("");
     setInfo("");
+    setResendCooldown(0);
   }
 
   async function handleSubmit() {
@@ -84,8 +93,9 @@ export default function LoginScreen({ onBack, onLogin }) {
     }
   }
 
-  // 비밀번호 찾기 1단계: 인증번호 발송
+  // 비밀번호 찾기 1단계: 인증번호 발송(+ 재전송)
   async function handleRequestReset() {
+    if (resendCooldown > 0) return;
     setError("");
     setInfo("");
     const id = resetEmail.trim();
@@ -100,6 +110,8 @@ export default function LoginScreen({ onBack, onLogin }) {
     setBusy(true);
     try {
       await requestPasswordReset(id);
+      setResetCode("");
+      setResendCooldown(60); // 재전송은 1분에 한 번만
       setView("forgotCode");
     } catch (e) {
       setError(authErrorToKorean(e, "reset"));
@@ -122,6 +134,7 @@ export default function LoginScreen({ onBack, onLogin }) {
       setView("forgotNew");
     } catch (e) {
       setError(authErrorToKorean(e, "reset"));
+      setResetCode(""); // 틀린 인증번호는 지우고 다시 입력하게
     } finally {
       setBusy(false);
     }
@@ -319,10 +332,10 @@ export default function LoginScreen({ onBack, onLogin }) {
               <button
                 type="button"
                 onClick={handleRequestReset}
-                disabled={busy}
-                className="mt-3 block w-full text-center text-xs font-semibold text-emerald-700 hover:underline"
+                disabled={busy || resendCooldown > 0}
+                className="mt-3 block w-full text-center text-xs font-semibold text-emerald-700 hover:underline disabled:text-stone-400 disabled:no-underline"
               >
-                인증번호 다시 받기
+                {resendCooldown > 0 ? `인증번호 다시 받기 (${resendCooldown}초 후 가능)` : "인증번호 다시 받기"}
               </button>
               <button
                 type="button"
@@ -382,7 +395,7 @@ function authErrorToKorean(e, mode) {
     return "이미 가입된 이메일입니다. ‘로그인’ 탭을 이용해주세요.";
   if (m.includes("email") && m.includes("confirm")) return "이메일 인증이 필요합니다. 메일을 확인해주세요.";
   if (mode === "reset" && (m.includes("token") || m.includes("otp") || m.includes("expired")))
-    return "인증번호가 올바르지 않거나 만료됐습니다. 다시 받아주세요.";
+    return "인증번호가 틀렸습니다. 다시 입력하거나, 안 왔다면 재전송 버튼을 눌러주세요.";
   if (m.includes("password")) return "비밀번호 조건을 확인해주세요(6자 이상).";
   if (m.includes("rate limit")) return "요청이 많습니다. 잠시 후 다시 시도해주세요.";
   if (mode === "reset") return "비밀번호 찾기 중 오류가 발생했습니다: " + (e?.message || "알 수 없음");
