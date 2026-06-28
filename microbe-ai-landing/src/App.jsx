@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import MicrobeAiLandingPage from "./LandingPage.jsx";
 import { CropSelect, AddressInput, LoadingScreen, ResultScreen, CheckScreen, CheckResultScreen } from "./AppFlow.jsx";
 import { CROPS } from "./data.js";
-import LoginModal from "./LoginModal.jsx";
+import LoginScreen from "./LoginScreen.jsx";
 import RecordsScreen from "./RecordsScreen.jsx";
 import { onAuthChange, signOut } from "./records.js";
 
@@ -17,13 +17,13 @@ export default function App() {
 
   // 실제 인증 상태 (Supabase 세션). 새로고침/재방문에도 유지되며, 미설정 시 null.
   const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => onAuthChange(setUser), []);
 
   function handleLogin(u) {
     setUser(u);            // onAuthChange 리스너도 곧 갱신하지만 즉시 반영
-    setShowLogin(false);
+    setView("landing");
+    window.scrollTo(0, 0);
   }
   async function handleLogout() {
     await signOut();       // 리스너가 user를 null로 갱신
@@ -90,6 +90,8 @@ export default function App() {
 
   function renderView() {
     switch (view) {
+      case "login":
+        return <LoginScreen onBack={goHome} onLogin={handleLogin} />;
       case "crop":
         return <CropSelect crop={crop} onSelect={setCrop} onBack={goHome} onNext={() => setView("address")} />;
       case "address":
@@ -130,7 +132,7 @@ export default function App() {
             onStartRecommend={startRecommend}
             onStartCheck={startCheck}
             user={user}
-            onLoginClick={() => setShowLogin(true)}
+            onLoginClick={() => setView("login")}
             onLogout={handleLogout}
             onMyRecords={startMyRecords}
           />
@@ -138,10 +140,5 @@ export default function App() {
     }
   }
 
-  return (
-    <>
-      {renderView()}
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLogin={handleLogin} />}
-    </>
-  );
+  return <>{renderView()}</>;
 }

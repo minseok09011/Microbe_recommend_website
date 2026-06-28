@@ -62,6 +62,33 @@ export async function signOut() {
   if (supabase) await supabase.auth.signOut();
 }
 
+// 비밀번호 찾기 1단계: 가입된 이메일로 6자리 인증번호 발송
+export async function requestPasswordReset(email) {
+  ensure();
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+  if (error) throw error;
+}
+
+// 비밀번호 찾기 2단계: 인증번호 확인(통과하면 임시 세션 발급)
+export async function verifyResetCode(email, code) {
+  ensure();
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: code.trim(),
+    type: "recovery",
+  });
+  if (error) throw error;
+  return data; // { user, session }
+}
+
+// 비밀번호 찾기 3단계: 새 비밀번호로 변경(2단계 통과 세션 필요)
+export async function updatePassword(newPassword) {
+  ensure();
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+  return data;
+}
+
 // 기록 저장 — user_id 미포함(RLS 기본값 auth.uid())
 export async function saveRecord(rec) {
   ensure();
