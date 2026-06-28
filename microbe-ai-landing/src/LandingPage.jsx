@@ -102,7 +102,7 @@ function IconBox({ icon: Icon, className = "", iconClassName = "h-6 w-6 text-whi
    1. HERO
 ────────────────────────────────────────────────────────────── */
 function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, onMyRecords }) {
-  const stats = [{ value: "1,764편", label: "A급 논문 학습" }, { value: "4종", label: "공공 데이터 활용" }, { value: "48종", label: "추천 가능한 미생물" }];
+  const stats = [{ value: "1,764편", label: "A급 논문 학습" }, { value: "5종", label: "공공 데이터 활용" }, { value: "48종", label: "추천 가능한 미생물" }];
 
   return (
     <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
