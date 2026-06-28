@@ -447,7 +447,7 @@ function loadMicrobeDisclosure() {
             priceWon: parsePriceWon(row["가격"]),
             contact: (row["연락처(사업장)"] || "").trim(),
             address: (row["제조장주소"] || "").trim(),
-            onlineUrl: (row["online_url"] || "").trim(), // 네이버쇼핑 등 온라인 구매 링크(없으면 빈칸 → 전화 폴백)
+            onlineUrl: ((row["online_url"] || "").trim()).replace("https://smartstore.naver.com/main/products/", "https://shopping.naver.com/product/"),
             registrar: (row["공시기관"] || "").trim(),
             validPeriod: (row["유효기간"] || "").trim(),
             registered: !UNREGISTERED_LABELS.has(registeredLabel),

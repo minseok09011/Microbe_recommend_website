@@ -448,38 +448,53 @@ function ServiceShowcase() {
       desc: "최근 뿌린 농약·비료를 입력하면, 미생물이 죽지 않는 안전한 살포 시기를 신호등으로 알려드립니다.",
       card: (
         <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto font-medium" style={{ minHeight: 420 }}>
-          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-center mb-3">
-            <p className="text-2xl mb-1">🟡</p>
-            <p className="font-bold text-amber-700 text-base">조금 더 기다리는 게 좋아요</p>
-            <p className="text-sm text-stone-700 mt-1">권장 살포 가능일: 2026-07-12</p>
+          {/* 핵심 판정 — 실제 결과화면과 동일 */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-600 text-white p-4">
+            <img
+              src="img/토비오 펫말 O.png"
+              alt=""
+              className="absolute -right-2 -bottom-10 h-32 w-auto object-contain opacity-90"
+            />
+            <div className="relative">
+              <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/80 mb-2">
+                Spray Check
+              </span>
+              <div className="flex items-center gap-3 mb-1.5">
+                <span className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-full bg-white/95">
+                  <svg width="24" height="24" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle cx="20" cy="20" r="18" fill="#fff" />
+                    <circle cx="20" cy="20" r="12" fill="none" stroke="#3b82f6" strokeWidth="3.5" />
+                  </svg>
+                </span>
+                <p className="font-bold text-[15px] leading-tight">지금 살포해도 괜찮아요</p>
+              </div>
+              <p className="text-[11px] text-white/85 leading-relaxed">2026-06-28 살포 가능 — 권장 간격을 충족합니다</p>
+              <p className="mt-2 text-xs font-semibold">📅 권장 살포 가능일: 2026-06-28</p>
+            </div>
           </div>
+
+          {/* 왜 이렇게 안내했나요 */}
+          <div className="bg-stone-50 rounded-lg p-3 mb-3">
+            <p className="text-xs font-bold text-stone-600 mb-1.5 flex items-center gap-1">💡 왜 이렇게 안내했나요?</p>
+            <p className="text-[11px] text-stone-500 leading-relaxed">최근 살포하신 오티바(스트로빌루린)의 권장 간격이 약 0일이라, 이미 안전 구간에 들어왔어요.</p>
+          </div>
+
+          {/* 자재별 안전 해제일 */}
           <div className="bg-white border border-stone-200 rounded-lg p-3">
             <p className="text-xs font-bold text-stone-500 mb-2">자재별 안전 해제일</p>
-            <div className="divide-y divide-stone-100">
-              <div className="py-2 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full shrink-0 bg-rose-500" />
-                  <span className="text-sm font-medium text-stone-800">
-                    석회황<span className="font-normal text-stone-400"> · 석회유황합제</span>
-                  </span>
-                </div>
-                <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-stone-400 whitespace-nowrap">위험 · 14일</span>
-                  <span className="text-sm font-semibold text-stone-800 whitespace-nowrap">2026-07-12</span>
-                </div>
-                <div className="mt-1.5 ml-3.5 inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
-                  <AlertTriangle size={10} /> 가장 큰 영향
-                </div>
+            <div className="py-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-500" />
+                <span className="text-sm font-medium text-stone-800">
+                  오티바<span className="font-normal text-stone-400"> · 스트로빌루린(QoI)</span>
+                </span>
               </div>
-              <div className="py-2 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-500" />
-                  <span className="text-sm font-medium text-stone-800">다트롤</span>
-                </div>
-                <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-stone-400 whitespace-nowrap">안전 · 0일</span>
-                  <span className="text-sm font-semibold text-stone-800 whitespace-nowrap">2026-06-28</span>
-                </div>
+              <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-stone-400 whitespace-nowrap">안전 · 0일</span>
+                <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">2026-06-28</span>
+              </div>
+              <div className="mt-1.5 ml-3.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                가장 큰 영향
               </div>
             </div>
           </div>
