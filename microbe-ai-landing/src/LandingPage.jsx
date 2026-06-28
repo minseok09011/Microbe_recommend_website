@@ -383,25 +383,25 @@ function ServiceShowcase() {
       title: "AI 맞춤 미생물 추천",
       desc: "주소와 작물만 입력하면, 실시간 토양·기상 데이터를 분석해 A급 논문 1,764편 근거의 최적 미생물을 추천합니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto font-medium" style={{ minHeight: 420 }}>
           <div className="bg-gradient-to-br from-emerald-800 to-emerald-600 rounded-xl p-4 mb-4 text-white">
-            <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">AI Recommendation</p>
-            <p className="font-bold text-sm">토비오의 미생물 추천</p>
-            <p className="text-[11px] text-white/80 mt-1">작물: 양파 | 농경지: 전남 화순군</p>
+            <p className="text-xs uppercase tracking-widest text-white/70 mb-1">AI Recommendation</p>
+            <p className="font-bold text-base">토비오의 미생물 추천</p>
+            <p className="text-xs text-white/80 mt-1">작물: 양파 | 농경지: 전남 화순군</p>
           </div>
           <div className="flex gap-2 mb-3">
             <div className="flex-1 bg-stone-100 rounded-lg px-2.5 py-2">
-              <p className="text-[10px] font-bold text-stone-500">지역 추정값</p>
-              <p className="text-[9px] text-stone-400">토양 통계 기반</p>
+              <p className="text-xs font-bold text-stone-500">지역 추정값</p>
+              <p className="text-[11px] text-stone-400">토양 통계 기반</p>
             </div>
             <div className="bg-emerald-50 rounded-lg px-2.5 py-2 text-center">
-              <p className="text-[10px] font-bold text-emerald-700">근거 강도</p>
-              <p className="text-amber-500 text-xs">★★★★</p>
+              <p className="text-xs font-bold text-emerald-700">근거 강도</p>
+              <p className="text-amber-500 text-sm">★★★★</p>
             </div>
           </div>
           <div className="bg-emerald-50 rounded-lg p-3.5">
-            <p className="text-[10px] font-bold text-emerald-800 mb-1.5">상황 설명</p>
-            <p className="text-[9px] text-emerald-700 leading-relaxed">내 밭의 토양 산도, 유기물, 수분, 기온 등을 종합 분석하여 전문 용어 없이 농민이 바로 이해할 수 있는 쉬운 말로 설명해드립니다. 논문 근거가 필요하면 "더보기"에서 학술 인용까지 확인할 수 있어요.</p>
+            <p className="text-xs font-bold text-emerald-800 mb-1.5">상황 설명</p>
+            <p className="text-[11px] text-emerald-700 leading-relaxed">내 밭의 토양 산도, 유기물, 수분, 기온 등을 종합 분석하여 전문 용어 없이 농민이 바로 이해할 수 있는 쉬운 말로 설명해드립니다. 논문 근거가 필요하면 "더보기"에서 학술 인용까지 확인할 수 있어요.</p>
           </div>
         </div>
       ),
@@ -410,29 +410,29 @@ function ServiceShowcase() {
       title: "실제 판매처 바로 연결",
       desc: "추천된 미생물의 등록 제품 수, 가격대, 연락처까지 한눈에 비교하고 온라인 구매로 바로 연결됩니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
-          <div className="bg-amber-400 rounded-t-lg px-3 py-2 flex items-center gap-1.5">
-            <span className="text-xs font-bold text-black">토비오의 최고 추천</span>
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto font-medium" style={{ minHeight: 420 }}>
+          <div className="bg-amber-400 rounded-t-lg px-3 py-2.5 flex items-center gap-1.5">
+            <span className="text-sm font-bold text-black">토비오의 최고 추천</span>
           </div>
           <div className="border border-stone-200 border-t-0 rounded-b-lg p-3 mb-3">
-            <p className="font-bold text-sm italic text-stone-900 mb-2">Bacillus megaterium</p>
+            <p className="font-bold text-base italic text-stone-900 mb-2">Bacillus megaterium</p>
             <div className="flex gap-1.5 mb-2">
-              <span className="text-[9px] font-bold bg-emerald-600 text-white rounded-full px-2 py-0.5">농약/비료 등록됨</span>
-              <span className="text-[9px] font-bold bg-stone-100 text-stone-600 rounded-full px-2 py-0.5">등록 제품 2개</span>
+              <span className="text-[11px] font-bold bg-emerald-600 text-white rounded-full px-2.5 py-0.5">농약/비료 등록됨</span>
+              <span className="text-[11px] font-bold bg-stone-100 text-stone-600 rounded-full px-2.5 py-0.5">등록 제품 2개</span>
             </div>
           </div>
-          <p className="text-[10px] font-bold text-stone-500 mb-2">구매 가능 판매처 (2곳)</p>
+          <p className="text-xs font-bold text-stone-500 mb-2">구매 가능 판매처 (2곳)</p>
           {[
             { name: "XXX코리아", product: "토양미생물제제", price: "8,000원/500g", tel: "042-000-0000" },
             { name: "XXX바이오텍", product: "미생물 제제", price: "25,000원/500mL", tel: "033-000-0000" },
           ].map((v) => (
-            <div key={v.name} className="border-l-4 border-l-amber-400 border border-stone-200 rounded-r-lg px-2.5 py-2 mb-3 bg-stone-50">
-              <p className="text-xs font-bold text-stone-800">{v.name}</p>
-              <p className="text-[9px] text-stone-500">{v.product}</p>
-              <p className="text-[9px] text-stone-500">{v.price}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-stone-600 border border-stone-300 rounded px-1.5 py-0.5 bg-white">📞 {v.tel}</span>
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-white bg-emerald-700 rounded px-1.5 py-0.5">🛒 온라인 구매</span>
+            <div key={v.name} className="border-l-4 border-l-amber-400 border border-stone-200 rounded-r-lg px-2.5 py-2.5 mb-3 bg-stone-50">
+              <p className="text-sm font-bold text-stone-800">{v.name}</p>
+              <p className="text-[11px] text-stone-500">{v.product}</p>
+              <p className="text-[11px] text-stone-500">{v.price}</p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-stone-600 border border-stone-300 rounded px-2 py-0.5 bg-white">📞 {v.tel}</span>
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-white bg-emerald-700 rounded px-2 py-0.5">🛒 온라인 구매</span>
               </div>
             </div>
           ))}
@@ -443,22 +443,22 @@ function ServiceShowcase() {
       title: "살포 안전일 자동 계산",
       desc: "최근 뿌린 농약·비료를 입력하면, 미생물이 죽지 않는 안전한 살포 시기를 신호등으로 알려드립니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto font-medium" style={{ minHeight: 420 }}>
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-center mb-3">
             <p className="text-2xl mb-1">🟡</p>
-            <p className="font-bold text-amber-700 text-sm">조금 더 기다리는 게 좋아요</p>
-            <p className="text-xs text-stone-700 mt-1">권장 살포 가능일: 2026-07-12</p>
+            <p className="font-bold text-amber-700 text-base">조금 더 기다리는 게 좋아요</p>
+            <p className="text-sm text-stone-700 mt-1">권장 살포 가능일: 2026-07-12</p>
           </div>
           <div className="bg-white border border-stone-200 rounded-lg p-3 mb-2">
-            <p className="text-[10px] font-bold text-stone-500 mb-1.5">가장 영향이 큰 자재</p>
-            <p className="text-xs text-stone-700">🔴 <strong>석회황</strong> (석회유황합제) — 14일</p>
+            <p className="text-xs font-bold text-stone-500 mb-1.5">가장 영향이 큰 자재</p>
+            <p className="text-sm text-stone-700">🔴 <strong>석회황</strong> (석회유황합제) — 14일</p>
           </div>
           <div className="bg-white border border-stone-200 rounded-lg p-3">
-            <p className="text-[10px] font-bold text-stone-500 mb-1.5">자재별 안전 해제일</p>
-            <div className="flex justify-between text-[10px] text-stone-600 mb-1">
+            <p className="text-xs font-bold text-stone-500 mb-1.5">자재별 안전 해제일</p>
+            <div className="flex justify-between text-xs text-stone-600 mb-1">
               <span>🔴 석회황</span><span>2026-07-12 (14일)</span>
             </div>
-            <div className="flex justify-between text-[10px] text-stone-600">
+            <div className="flex justify-between text-xs text-stone-600">
               <span>🟢 다트롤</span><span>2026-06-28 (0일)</span>
             </div>
           </div>
