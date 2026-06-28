@@ -223,7 +223,8 @@ export async function fetchRecommend(crop, address, onStatus) {
       // 1-3) 토양·기상·농지여부
       const mergedRes = await fetch(
         `${API_BASE_URL}/api/getMergedData?stationId=${station.id}&lat=${lat}&lng=${lng}` +
-          `&stdgCd=${encodeURIComponent(stdgCd)}&dateStr=${dateStr}&timeStr=${timeStr}`,
+          `&stdgCd=${encodeURIComponent(stdgCd)}&dateStr=${dateStr}&timeStr=${timeStr}` +
+          `&crop=${encodeURIComponent(crop)}`,
         { signal: AbortSignal.timeout(20000) }
       );
       env = await mergedRes.json();

@@ -598,6 +598,7 @@ function classify(value, midpoints, labels) {
 }
 
 function buildQueryText(crop, data) {
+    const cat = fieldTypeOf(crop);
     const parts = [`${crop} cultivation soil`];
 
     const phLabel = classify(data.soilPh, GRADE_MIDPOINTS.ph, FIELD_LABELS.ph);
@@ -606,13 +607,13 @@ function buildQueryText(crop, data) {
     const omLabel = classify(data.soilOrganic, GRADE_MIDPOINTS.om, FIELD_LABELS.om);
     if (omLabel) parts.push(omLabel);
 
-    const apLabel = classify(data.soilPhosphate, GRADE_MIDPOINTS.ap, FIELD_LABELS.ap);
+    const apLabel = classify(data.soilPhosphate, midpointsFor("ap", cat), FIELD_LABELS.ap);
     if (apLabel) parts.push(apLabel);
 
-    const kLabel = classify(data.soilPotassium, GRADE_MIDPOINTS.k, FIELD_LABELS.k);
+    const kLabel = classify(data.soilPotassium, midpointsFor("k", cat), FIELD_LABELS.k);
     if (kLabel) parts.push(kLabel);
 
-    const caLabel = classify(data.soilCalcium, GRADE_MIDPOINTS.ca, FIELD_LABELS.ca);
+    const caLabel = classify(data.soilCalcium, midpointsFor("ca", cat), FIELD_LABELS.ca);
     if (caLabel) parts.push(caLabel);
 
     const mgLabel = classify(data.soilMagnesium, GRADE_MIDPOINTS.mg, FIELD_LABELS.mg);
@@ -1045,18 +1046,31 @@ async function resolveFarmlandCheck(lat, lng) {
  * [4] 농촌진흥청 국립농업과학원_농경지화학성 통계정보 V2 (법정동 단위, 등급별 면적 통계)
  * 좌표 기반 실측값이 없을 때의 대체 추정용입니다. 그 동네(법정동) 농경지 중
  * "면적이 가장 큰 등급"을 찾아 그 등급의 대표값(중간값)으로 추정합니다.
- * 지원 작물이 모두 밭 작물(논 작물인 벼는 미지원)이라 밭(Pfld) 구간을 기본으로 사용합니다.
+ * 등급 경계는 지목(논 Rfld / 밭 Pfld / 과수 Fruit)별로 다르므로 작물에 맞는 구간을 사용합니다.
+ * (유효인산·칼륨·칼슘이 지목별로 다름. pH·유기물·마그네슘은 논=밭 공용. 과수는 밭 구간 재사용.)
  * 유효규산은 이 API가 논(Rfld) 구간만 제공해 그것을 사용합니다.
  */
 const GRADE_MIDPOINTS = {
-    ph: [4.0, 4.8, 5.3, 5.8, 6.3, 7.0],
-    om: [5, 15, 25, 35, 45, 55],
-    ap: [100, 250, 350, 450, 550, 700],
-    k: [0.15, 0.35, 0.45, 0.55, 0.65, 0.85],
-    ca: [1.5, 3.5, 4.5, 5.5, 6.5, 8.0],
-    mg: [0.25, 0.8, 1.3, 1.8, 2.3, 3.0],
-    sa: [25, 75, 125, 175, 225, 300],
+    ph: [4.0, 4.8, 5.3, 5.8, 6.3, 7.0],   // 논=밭 동일
+    om: [5, 15, 25, 35, 45, 55],          // 논=밭 동일
+    mg: [0.25, 0.8, 1.3, 1.8, 2.3, 3.0],  // 논=밭 동일
+    sa: [25, 75, 125, 175, 225, 300],     // 논(Rfld) 전용
+    // 지목별로 등급 경계가 다른 항목 (명세서 기준)
+    ap: { Pfld: [100, 250, 350, 450, 550, 700], Rfld: [25, 75, 125, 175, 225, 300] },
+    k:  { Pfld: [0.15, 0.35, 0.45, 0.55, 0.65, 0.85], Rfld: [0.05, 0.15, 0.25, 0.35, 0.45, 0.60] },
+    ca: { Pfld: [1.5, 3.5, 4.5, 5.5, 6.5, 8.0], Rfld: [1.5, 2.5, 3.5, 4.5, 5.5, 7.0] },
 };
+
+// 작물 → 지목 (명세서 컬럼명: 논 Rfld / 밭 Pfld / 과수 Fruit / 시설 Fachs)
+const CROP_FIELD_TYPE = { rice: "Rfld", apple: "Fruit" };
+function fieldTypeOf(crop) { return CROP_FIELD_TYPE[crop] || "Pfld"; }
+
+// 미들포인트 선택: ap/k/ca는 지목별, 나머지는 공용.
+// 과수(Fruit)·시설은 ap/k/ca 구간이 밭과 같아 Pfld 값을 재사용한다.
+function midpointsFor(param, fieldType) {
+    const m = GRADE_MIDPOINTS[param];
+    return Array.isArray(m) ? m : (m[fieldType] || m.Pfld);
+}
 
 async function fetchSoilGradeStat(operation, stdgCd) {
     const url = `https://apis.data.go.kr/1390802/SoilEnviron/SoilExamStat/V2/${operation}?serviceKey=${API_KEY}&STDG_CD=${stdgCd}`;
@@ -1081,7 +1095,8 @@ function pickModalMidpoint(xml, fieldPrefix, category, midpoints) {
     return midpoints[maxIdx];
 }
 
-async function fetchSoilGradeEstimate(stdgCd) {
+async function fetchSoilGradeEstimate(stdgCd, crop) {
+    const cat = fieldTypeOf(crop);
     const [phXml, omXml, apXml, kXml, caXml, mgXml, saXml] = await Promise.all([
         fetchSoilGradeStat("getFarmExamPhInfo", stdgCd).catch(() => null),
         fetchSoilGradeStat("getFarmExamOmInfo", stdgCd).catch(() => null),
@@ -1092,13 +1107,20 @@ async function fetchSoilGradeEstimate(stdgCd) {
         fetchSoilGradeStat("getFarmExamSaInfo", stdgCd).catch(() => null),
     ]);
 
-    const soilPh = phXml && pickModalMidpoint(phXml, "acid", "Pfld", GRADE_MIDPOINTS.ph);
-    const soilOrganic = omXml && pickModalMidpoint(omXml, "om", "Pfld", GRADE_MIDPOINTS.om);
-    const soilPhosphate = apXml && pickModalMidpoint(apXml, "vldpha", "Pfld", GRADE_MIDPOINTS.ap);
-    const soilPotassium = kXml && pickModalMidpoint(kXml, "posifertk", "Pfld", GRADE_MIDPOINTS.k);
-    const soilCalcium = caXml && pickModalMidpoint(caXml, "posifertca", "Pfld", GRADE_MIDPOINTS.ca);
-    const soilMagnesium = mgXml && pickModalMidpoint(mgXml, "posifertmg", "Pfld", GRADE_MIDPOINTS.mg);
-    const soilSilicate = saXml && pickModalMidpoint(saXml, "vldsia", "Rfld", GRADE_MIDPOINTS.sa);
+    // 해당 지목 컬럼으로 읽고, 그 지목 면적이 0이면 밭으로 폴백(미들포인트도 짝 맞춤)
+    const pick = (xml, prefix, paramKey) => {
+        if (!xml) return null;
+        return pickModalMidpoint(xml, prefix, cat, midpointsFor(paramKey, cat))
+            ?? pickModalMidpoint(xml, prefix, "Pfld", midpointsFor(paramKey, "Pfld"));
+    };
+
+    const soilPh        = pick(phXml, "acid",       "ph");
+    const soilOrganic   = pick(omXml, "om",         "om");
+    const soilPhosphate = pick(apXml, "vldpha",     "ap");
+    const soilPotassium = pick(kXml,  "posifertk",  "k");
+    const soilCalcium   = pick(caXml, "posifertca", "ca");
+    const soilMagnesium = pick(mgXml, "posifertmg", "mg");
+    const soilSilicate  = saXml && pickModalMidpoint(saXml, "vldsia", "Rfld", GRADE_MIDPOINTS.sa);
 
     if (!soilPh && !soilOrganic && !soilPhosphate) {
         throw new Error("지역 등급 통계 데이터 없음");
@@ -1116,7 +1138,7 @@ async function fetchSoilGradeEstimate(stdgCd) {
 }
 
 // 1순위: 좌표 기반 실측값 → 2순위: 법정동 등급 통계 추정값 → 3순위: 전국 평균 고정값
-async function resolveSoilData(lat, lng, stdgCd) {
+async function resolveSoilData(lat, lng, stdgCd, crop) {
     try {
         const exact = await fetchSoilAnalysis(lat, lng);
         return { ...exact, soilDataSource: "실측값" };
@@ -1126,7 +1148,7 @@ async function resolveSoilData(lat, lng, stdgCd) {
 
     if (stdgCd) {
         try {
-            const estimate = await fetchSoilGradeEstimate(stdgCd);
+            const estimate = await fetchSoilGradeEstimate(stdgCd, crop);
             return { ...estimate, soilEc: 0.0, soilDataSource: "지역 추정값" };
         } catch (error) {
             console.error("❌ 법정동 등급 통계 에러:", error.message);
@@ -1147,7 +1169,7 @@ async function resolveSoilData(lat, lng, stdgCd) {
 }
 
 app.get("/api/getMergedData", rateLimit, async (req, res) => {
-    const { stationId, lat, lng, stdgCd, dateStr, timeStr } = req.query;
+    const { stationId, lat, lng, stdgCd, dateStr, timeStr, crop } = req.query;
 
     if (!lat || !lng || !dateStr || !timeStr) {
         return res.status(400).json({ error: "lat, lng, dateStr, timeStr는 필수 파라미터입니다." });
@@ -1160,7 +1182,7 @@ app.get("/api/getMergedData", rateLimit, async (req, res) => {
 
         const [agriWeather, soilData, farmlandInfo] = await Promise.all([
             fetchAgriTenMinWeather(stationId, dateStr, hourStr),
-            resolveSoilData(lat, lng, stdgCd),
+            resolveSoilData(lat, lng, stdgCd, crop),
             resolveFarmlandCheck(lat, lng),
         ]);
 
