@@ -17,7 +17,7 @@ import TobioMascot from "./TobioMascot.jsx";
    - Supabase 미설정(authReady=false)이면 안내만 표시.
    - 비밀번호 찾기: 이메일 → 인증번호 → 새 비밀번호 3단계.
      (Supabase 대시보드의 Reset Password 메일 템플릿이 {{ .Token }}을
-     포함해야 링크 대신 6자리 인증번호가 발송됨)
+     포함해야 링크 대신 8자리 인증번호가 발송됨)
 ────────────────────────────────────────────────────────────── */
 export default function LoginScreen({ onBack, onLogin }) {
   const [view, setView] = useState("login"); // login | signup | forgotEmail | forgotCode | forgotNew
@@ -308,7 +308,7 @@ export default function LoginScreen({ onBack, onLogin }) {
           {view === "forgotCode" && (
             <>
               <p className="mb-4 mt-4 text-xs leading-relaxed text-stone-500">
-                <strong className="text-stone-700">{resetEmail}</strong> 로 보낸 6자리 인증번호를 입력해주세요.
+                <strong className="text-stone-700">{resetEmail}</strong> 로 보낸 8자리 인증번호를 입력해주세요.
               </p>
               <label className="mb-1 block text-sm font-semibold text-stone-700">인증번호</label>
               <input
@@ -317,7 +317,7 @@ export default function LoginScreen({ onBack, onLogin }) {
                 value={resetCode}
                 onChange={(e) => { setResetCode(e.target.value); setError(""); }}
                 onKeyDown={(e) => e.key === "Enter" && handleVerifyCode()}
-                placeholder="6자리 숫자"
+                placeholder="8자리 숫자"
                 autoComplete="one-time-code"
                 className="mb-2 w-full rounded-md border border-stone-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-600"
               />
