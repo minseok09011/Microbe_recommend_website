@@ -101,7 +101,7 @@ function IconBox({ icon: Icon, className = "", iconClassName = "h-6 w-6 text-whi
    1. HERO
 ────────────────────────────────────────────────────────────── */
 function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, onMyRecords }) {
-  const stats = [{ value: "1,764편", label: "A급 논문 학습" }, { value: "4종", label: "공공 데이터 활용" }];
+  const stats = [{ value: "1,764편", label: "A급 논문 학습" }, { value: "4종", label: "공공 데이터 활용" }, { value: "48종", label: "추천 가능한 미생물" }];
 
   return (
     <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
@@ -149,9 +149,9 @@ function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, on
               {stats.map((s, i) => (
                 <React.Fragment key={s.label}>
                   {i > 0 && <div className="w-px h-12 bg-white/30" />}
-                  <div className="text-center">
+                  <div className="text-center min-w-[100px]">
                     <p className="text-xl md:text-3xl font-bold text-amber-400 whitespace-nowrap">{s.value}</p>
-                    <p className="text-xs md:text-sm text-white/70">{s.label}</p>
+                    <p className="text-xs md:text-sm text-white/70 whitespace-nowrap">{s.label}</p>
                   </div>
                 </React.Fragment>
               ))}
