@@ -105,14 +105,10 @@ function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, on
 
   return (
     <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
-      {/* 영상 자리 — 토양 단면을 연상시키는 그라디언트 + 텍스처 placeholder */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-emerald-900 to-amber-900" />
+      {/* 배경 이미지 — 농경지 항공 사진 */}
       <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.25) 0, transparent 45%), radial-gradient(circle at 80% 70%, rgba(217,119,6,0.35) 0, transparent 45%)",
-        }}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url(img/dan-meyers-IQVFVH0ajag-unsplash.jpg)" }}
       />
       <Sprout className="absolute -bottom-10 -left-10 h-72 w-72 text-emerald-700/20 rotate-12" />
       <Microscope className="absolute -top-10 -right-10 h-72 w-72 text-amber-500/10 -rotate-12" />
