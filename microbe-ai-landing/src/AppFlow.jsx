@@ -605,7 +605,7 @@ function SoilInfoPanel({ soilInfo }) {
 /* ──────────────────────────────────────────────────────────────
    결과 화면
 ────────────────────────────────────────────────────────────── */
-export function ResultScreen({ result, crop, address, onCheck, onHome }) {
+export function ResultScreen({ result, crop, purpose, address, onCheck, onHome }) {
   const [showAll, setShowAll] = useState(false);
   const [showSoilInfo, setShowSoilInfo] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -617,6 +617,7 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
   const collapseVendors = (i) => setVendorCounts((prev) => ({ ...prev, [i]: 3 }));
   const cropName = CROPS.find((c) => c.id === crop)?.name || crop || "";
   const addrName = address?.address || address?.roadAddr || address?.jibunAddr || "입력 주소";
+  const purposeMeta = PURPOSES.find((p) => p.id === purpose);
 
   if (!result || result.error) {
     return (
@@ -636,6 +637,7 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
 
   const microbes = result.microbes || result.recommendations || (Array.isArray(result) ? result : [result]);
   const explanation = result.explanation || "";
+  const purposeIntro = result.purposeIntro || ""; // 목적 명시 첫 문장(구버전 응답엔 없음 → 빈 문자열)
   const scientificEvidence = result.scientificEvidence || "";
   const sources = Array.isArray(result.sources) ? result.sources : [];
 
@@ -661,7 +663,9 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
               </span>
               <h2 className="font-bold text-lg mb-1">토비오의 미생물 추천</h2>
               <p className="text-sm text-white/85">
-                작물: {cropName} &nbsp;|&nbsp; 농경지: {addrName}
+                작물: {cropName}
+                {purposeMeta ? <> &nbsp;|&nbsp; 목적: {purposeMeta.icon} {purposeMeta.name}</> : null}
+                &nbsp;|&nbsp; 농경지: {addrName}
               </p>
               {result.landUseType && (
                 <p className="text-xs text-white/70 mt-1">✅ 확인된 농경지: {result.landUseType}</p>
@@ -721,12 +725,15 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
           </div>
         )}
 
-        {/* 상황 설명 (백엔드 explanation) */}
-        {explanation && (
+        {/* 상황 설명 (백엔드 purposeIntro + explanation) */}
+        {(explanation || purposeIntro) && (
           <Reveal>
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-3 text-sm text-emerald-900">
               <p className="font-bold mb-1.5">🔍 상황 설명</p>
-              <p className={`leading-relaxed ${showExplanation ? "" : "line-clamp-4"}`}>{explanation}</p>
+              <p className={`leading-relaxed ${showExplanation ? "" : "line-clamp-4"}`}>
+                {purposeIntro && <span className="font-bold text-emerald-700">{purposeIntro} </span>}
+                {explanation}
+              </p>
               <button
                 onClick={() => setShowExplanation((v) => !v)}
                 className="mt-2 text-xs font-semibold text-emerald-700 underline"

@@ -783,7 +783,8 @@ ${candidateList}
     { "species": "학명1", "reason": "이 미생물을 선정한 구체적 이유. 위 농경지 수치(산도/유기물/영양분 등)와 직접 연결지어, 농사 짓는 분이 이해할 수 있는 말투로 2~3문장." },
     { "species": "학명2", "reason": "..." }
   ],
-  "explanation": "전문 용어와 논문 인용 없이, 농사 짓는 분이 바로 이해할 수 있는 쉽고 친근한 말투의 한국어로 작성. (1) 이 농경지의 토양 상태(산도, 유기물, 영양분 등)가 작물 재배에 어떤 의미인지 일상적인 표현으로 설명하고, (2) 추천한 미생물이 구체적으로 어떤 효능이 있어서 이 토양과 작물에 도움이 되는지 설명. 4~6문장.",
+  "purposeIntro": "상황 설명의 첫 문장. 위 [추천 목적]을 명시하며 시작하는 한 문장으로 작성한다(예: \"해충 억제 관점에서 보면, 현재 농경지는 …\"). 그리고 이 작물·목적 조합의 직접적인 논문 근거가 약하면 그 사실을 이 문장 또는 explanation 안에서 솔직하게 언급한다(예: \"다만 이 작물은 해당 목적의 직접 연구가 많지 않아 범용 미생물 위주로 추천드립니다\"). 과장하지 말 것.",
+  "explanation": "위 purposeIntro 첫 문장에 이어지는 나머지 본문(목적 문장을 중복하지 말 것). 전문 용어와 논문 인용 없이, 농사 짓는 분이 바로 이해할 수 있는 쉽고 친근한 말투의 한국어로 작성. (1) 이 농경지의 토양 상태(산도, 유기물, 영양분 등)가 작물 재배에 어떤 의미인지 일상적인 표현으로 설명하고, (2) 추천한 미생물이 구체적으로 어떤 효능이 있어서 이 토양과 작물에 도움이 되는지 설명. 4~6문장.",
   "scientificEvidence": "위 추천의 과학적 근거를 위 논문 발췌를 인용([1], [2] 등)하며 전문적으로 설명. 3~5문장."
 }`;
 
@@ -906,6 +907,7 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
             return res.status(502).json({ error: "추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요." });
         }
 
+        const purposeIntro = result.purposeIntro || ""; // 목적 명시 첫 문장(구버전 응답 안전 폴백)
         const explanation = result.explanation;
         const scientificEvidence = result.scientificEvidence;
         let recommendedSpecies = Array.isArray(result.recommendedSpecies) ? result.recommendedSpecies : [];
@@ -929,7 +931,7 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
         let evidenceConfidence = gradeEvidenceConfidence(evidenceScore.topScore);
         if (microbes.length === 0) evidenceConfidence = "weak";
 
-        res.json({ queryText, explanation, scientificEvidence, microbes, sources, evidenceConfidence, evidenceScore });
+        res.json({ queryText, purposeIntro, explanation, scientificEvidence, microbes, sources, evidenceConfidence, evidenceScore });
     } catch (error) {
         console.error("❌ 미생물 추천(LLM) 에러:", error.message);
         if (error.quotaExceeded) {
