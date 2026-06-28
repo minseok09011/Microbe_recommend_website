@@ -344,7 +344,7 @@ function CoreFeatures() {
                     <h3 className="text-sm font-semibold text-stone-900">{f.title}</h3>
                   </div>
                   <div className="overflow-hidden max-h-0 opacity-0 group-hover:max-h-40 group-hover:opacity-100 group-hover:mt-2 transition-all duration-300">
-                    <p className="text-stone-500 text-xs leading-relaxed">{f.desc}</p>
+                    <p className="text-stone-500 text-xs leading-relaxed text-center">{f.desc}</p>
                   </div>
                 </div>
               </div>
