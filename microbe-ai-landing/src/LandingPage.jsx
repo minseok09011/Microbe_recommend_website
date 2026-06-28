@@ -200,7 +200,6 @@ function SiteHeader({ user, onLoginClick, onLogout, onMyRecords }) {
   return (
     <header className="absolute top-0 left-0 right-0 z-20 px-4 pt-6 sm:pt-8">
       <div className="flex items-center justify-center gap-2">
-        <img src="img/tobio.png" alt="토비오" className="h-16 sm:h-20 w-auto object-contain drop-shadow-lg flex-shrink-0" />
         <span className="text-2xl sm:text-3xl font-bold text-white" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>
           TOBio 토비오
         </span>
