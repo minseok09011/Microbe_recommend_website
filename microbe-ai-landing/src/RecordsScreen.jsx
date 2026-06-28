@@ -96,6 +96,7 @@ export default function RecordsScreen({ onBack, onSelect }) {
                 </div>
                 <p className="font-semibold text-stone-800">{r.title || (isSpray ? "살포 확인 결과" : "추천 결과")}</p>
                 {r.crop && <p className="text-xs text-stone-500 mt-0.5">작물: {r.crop}</p>}
+                {r.payload?.address && <p className="text-xs text-stone-500 mt-0.5">지역: {r.payload.address}</p>}
                 {r.summary && <p className="text-sm text-stone-600 mt-1 leading-relaxed">{r.summary}</p>}
                 {r.payload && <p className="text-xs text-emerald-600 font-semibold mt-2">결과 다시 보기 &rarr;</p>}
               </button>
