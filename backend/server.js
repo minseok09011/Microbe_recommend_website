@@ -11,6 +11,8 @@ const cors = require("cors");
 const proj4 = require("proj4");
 const { parse: parseCsv } = require("csv-parse/sync");
 const { calcSpraySequence } = require("./spray_sequence"); // 살포 시퀀스 계산 엔진(검증 완료, 수정 금지)
+const { fetchVilageForecast } = require("./weather_forecast"); // 기상청 단기예보(타이밍 전용)
+const { bestApplyDay } = require("./application_window"); // 균종 인지 적용 적합일 + safeDate 교집합
 
 // 농림수산식품교육문화정보원 팜맵 API가 쓰는 좌표계 (EPSG:5179, GRS80 중부원점)
 const KOREA_5179 = "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs";
@@ -1357,6 +1359,35 @@ app.post("/api/spraySequence", rateLimit, async (req, res) => {
     } catch (error) {
         console.error("❌ 살포 시퀀스 에러:", error);
         res.status(500).json({ error: "살포 시퀀스 계산 중 서버 에러: " + error.message });
+    }
+});
+
+// ── 기상 적용창 (날씨 기반 최적 살포일) ───────────────────────────
+// 기상청 단기예보로 향후 ~3일의 미생물 적용 적합일을 계산하고, 살포 안전일(safeDate)과
+// 교집합해 "농약도 안전 + 날씨도 좋은 최적 살포일"을 반환한다. 종 선택·화학간격 불변.
+function todayStrKST() {
+    const kst = new Date(Date.now() + 9 * 3600 * 1000);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${kst.getUTCFullYear()}-${p(kst.getUTCMonth() + 1)}-${p(kst.getUTCDate())}`;
+}
+
+// GET /api/weatherWindow?lat=..&lng=..&inoculantType=..&safeDate=YYYY-MM-DD
+// safeDate 없으면 오늘로 간주(농약 미입력 케이스 → 날씨만으로 최적일).
+app.get("/api/weatherWindow", rateLimit, async (req, res) => {
+    try {
+        const lat = parseFloat(req.query.lat);
+        const lng = parseFloat(req.query.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return res.status(400).json({ error: "lat, lng 좌표가 필요합니다." });
+        }
+        const inoculantType = req.query.inoculantType || "both";
+        const safeDate = req.query.safeDate || todayStrKST();
+        const forecast = await fetchVilageForecast(lat, lng);
+        const result = bestApplyDay(forecast, safeDate, inoculantType);
+        res.json(result);
+    } catch (e) {
+        console.error("❌ 기상 적용창 에러:", e.message);
+        res.status(502).json({ error: "기상 예보를 가져오지 못했습니다.", detail: String(e.message || e) });
     }
 });
 
