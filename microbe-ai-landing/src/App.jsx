@@ -129,7 +129,7 @@ export default function App() {
         return <LoadingScreen crop={crop} purpose={purpose} address={address} onDone={handleLoadingDone} />;
       case "result":
         return (
-          <ResultScreen result={result} crop={crop} address={address} onCheck={goToCheckFromResult} onHome={backFromResult} />
+          <ResultScreen result={result} crop={crop} purpose={purpose} address={address} onCheck={goToCheckFromResult} onHome={backFromResult} />
         );
       case "check":
         return (
