@@ -10,7 +10,6 @@ import {
   verifyResetCode,
   updatePassword,
 } from "./records.js";
-import TobioPeekWave from "./TobioPeekWave.jsx";
 
 /* ──────────────────────────────────────────────────────────────
    로그인 / 회원가입 / 비밀번호 찾기 전체 화면.
@@ -186,7 +185,6 @@ export default function LoginScreen({ onBack, onLogin }) {
       {/* 왼쪽 비주얼 패널 */}
       <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: "url(img/로그인창.jpg)" }}>
         <div className="absolute inset-0 bg-black/35" />
-        <TobioPeekWave />
         <div className="relative z-10 mx-auto mt-[25%] px-10 text-center">
           <h2 className="text-2xl font-bold text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>TOBio와 함께 건강한 농사</h2>
           <p className="mt-3 text-sm leading-relaxed text-white/90" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}>
