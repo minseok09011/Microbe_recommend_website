@@ -480,12 +480,16 @@ function ServiceShowcase() {
         <Reveal delay={100}>
           <div className="relative max-w-sm mx-auto" style={{ minHeight: 560 }}>
             <div
-              className={`transition-all ease-in-out ${phase === "slideOut" ? "duration-[400ms]" : "duration-500"}`}
               style={{
                 opacity: phase === "visible" || phase === "fadeIn" ? 1 : 0,
                 transform: phase === "slideOut"
                   ? `translateX(${direction * 80}px)`
                   : "translateX(0)",
+                transition: phase === "slideOut"
+                  ? "opacity 400ms ease-in-out, transform 400ms ease-in-out"
+                  : phase === "fadeIn"
+                  ? "opacity 500ms ease-in-out"
+                  : "none",
               }}
               onTransitionEnd={() => { if (phase === "fadeIn") setPhase("visible"); }}
             >
