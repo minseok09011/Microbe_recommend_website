@@ -5,10 +5,11 @@ https://tobio.pages.dev/
 
 | 구분 | URL | 상태 | 소스 |
 |---|---|---|---|
-| **현재 라이브** | https://tobio.pages.dev | ✅ 운영 중 | `microbe-ai-landing/` (Cloudflare Pages) |
+| **현재 라이브** | https://tobio.pages.dev | ✅ 운영 중 | `microbe-ai-landing/` (React + Vite, Cloudflare Pages, master) |
 | **BEFORE (구버전)** | https://minseok09011.github.io/Microbe_recommend_website | ⚠️ 레거시·비교용 | 레포 루트 HTML (GitHub Pages) |
 
-> ⚠️ 수정은 반드시 **`microbe-ai-landing/`** 에서. 루트의 `a_recommend.html`, `js/app.js` 등은 BEFORE 데모임.
+> ⚠️ **수정은 반드시 `microbe-ai-landing/` 에서.** 루트의 `a_recommend.html`, `a-1_recommend-result.html` 등은 BEFORE 데모이며 현재 라이브에 반영되지 않는다.
+> 백엔드는 `backend/server.js` (Render).
 
 토양 성분과 기후 환경에 맞는 미생물 추천 웹사이트
 
