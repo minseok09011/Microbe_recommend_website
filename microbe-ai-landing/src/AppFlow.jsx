@@ -24,7 +24,9 @@ import {
   LOAD_STEPS,
   delay,
   searchAddress,
+  resolveLatLng,
   fetchRecommend,
+  fetchWeatherWindow,
   searchSprayMaterials,
   searchMicrobeProducts,
   fetchSpraySequence,
@@ -1209,21 +1211,54 @@ export function CheckScreen({ prefill, onBack, onResult }) {
   const inoculantTimerRef = useRef(null);
   const inoculantWrapRef = useRef(null);
 
+  // 농경지 주소 — 추천 경유 시 prefill.address 자동, 살포 단독 진입 시 직접 입력(기상 적용창용)
+  const [farmAddress, setFarmAddress] = useState(prefill?.address || null);
+  const [addrQuery, setAddrQuery] = useState(prefill?.address?.address || "");
+  const [addrResults, setAddrResults] = useState([]);
+  const [addrOpen, setAddrOpen] = useState(false);
+  const [addrSearching, setAddrSearching] = useState(false);
+  const addrTimerRef = useRef(null);
+  const addrWrapRef = useRef(null);
+
   useEffect(() => {
     setInoculantName(prefill?.microbe || "");
     setInoculantSpecies(prefill?.microbe || "");
     setInoculantType(classifyInoculantSpecies(prefill?.microbe));
     setInoculantDate(todayStr());
     setMaterials([newMaterial()]);
+    setFarmAddress(prefill?.address || null);
+    setAddrQuery(prefill?.address?.address || "");
   }, [prefill]);
 
   useEffect(() => {
     function outside(e) {
       if (inoculantWrapRef.current && !inoculantWrapRef.current.contains(e.target)) setInoculantOpen(false);
+      if (addrWrapRef.current && !addrWrapRef.current.contains(e.target)) setAddrOpen(false);
     }
     document.addEventListener("click", outside);
     return () => document.removeEventListener("click", outside);
   }, []);
+
+  function handleAddrChange(e) {
+    const q = e.target.value;
+    setAddrQuery(q);
+    setFarmAddress(null);
+    clearTimeout(addrTimerRef.current);
+    setAddrOpen(false);
+    if (q.trim().length < 2) return;
+    setAddrSearching(true);
+    addrTimerRef.current = setTimeout(async () => {
+      const r = await searchAddress(q);
+      setAddrSearching(false);
+      setAddrResults(r);
+      setAddrOpen(true);
+    }, 350);
+  }
+  function pickAddr(r) {
+    setFarmAddress(r);
+    setAddrQuery(r.address || r.roadAddr || r.jibunAddr || "");
+    setAddrOpen(false);
+  }
 
   function handleInoculantNameChange(e) {
     const name = e.target.value;
@@ -1268,6 +1303,15 @@ export function CheckScreen({ prefill, onBack, onResult }) {
     const data = await fetchSpraySequence({ inoculantName, inoculantSpecies, inoculantType, inoculantDate, materials: valid, onStatus: setWaking });
     setWaking(false);
     setChecking(false);
+
+    // 기상 적용창용 입력을 결과에 실어 전달(좌표는 농경지 주소에서 확보, 없으면 생략).
+    // 실제 기상 호출은 CheckResultScreen 진입 시(독립 폴백) — 살포 결과 표시를 막지 않음.
+    if (!data?.error) {
+      const coords = farmAddress ? await resolveLatLng(farmAddress) : null;
+      data.weatherInput = coords
+        ? { lat: coords.lat, lng: coords.lng, inoculantType, safeDate: data.safeDate }
+        : null;
+    }
     onResult(data);
   }
 
@@ -1287,6 +1331,48 @@ export function CheckScreen({ prefill, onBack, onResult }) {
             최근에 뿌린 농자재(농약, 비료 등)와 날짜를 알려주시면, 미생물이 죽지 않는 안전한 살포 시기를 계산해드려요.
           </p>
         </Reveal>
+
+        {/* 농경지 주소 — 살포 단독 진입 시에만 노출(추천 경유면 주소가 자동 전달됨). 날씨 적기 안내용·선택 */}
+        {!prefill?.address && (
+          <Reveal delay={40}>
+            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 mb-3.5">
+              <label className="block text-sm font-semibold text-stone-700 mb-2">
+                농경지 주소 <span className="font-normal text-stone-400">(날씨 기반 살포 적기 안내용 · 선택)</span>
+              </label>
+              <div ref={addrWrapRef} className="relative">
+                <input
+                  value={addrQuery}
+                  onChange={handleAddrChange}
+                  placeholder="예: 전북 김제시 ○○면"
+                  autoComplete="off"
+                  className="w-full rounded-md border border-stone-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                />
+                {addrSearching && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-lg shadow-lg text-center text-xs text-stone-500 py-2.5 z-20">
+                    검색 중...
+                  </div>
+                )}
+                {addrOpen && !addrSearching && addrResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-lg shadow-lg max-h-52 overflow-y-auto z-20">
+                    {addrResults.map((r, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => pickAddr(r)}
+                        className="px-3 py-2 cursor-pointer border-b border-stone-100 last:border-0 hover:bg-emerald-50"
+                      >
+                        <div className="text-sm font-semibold text-stone-800">{r.address || r.roadAddr || r.jibunAddr}</div>
+                        {r.roadAddr && r.roadAddr !== r.address && <div className="text-xs text-stone-500">{r.roadAddr}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-stone-400">
+                주소를 입력하면 농약 안전일 이후 날씨가 좋은 살포 적기를 함께 알려드려요. (입력 안 해도 안전일 계산은 됩니다)
+              </p>
+            </div>
+          </Reveal>
+        )}
 
         {/* 뿌릴 미생물제 */}
         <Reveal delay={60}>
@@ -1382,6 +1468,27 @@ export function CheckScreen({ prefill, onBack, onResult }) {
    살포 확인 결과 화면 (별도 페이지)
 ────────────────────────────────────────────────────────────── */
 export function CheckResultScreen({ result, onBack }) {
+  // 기상 적용창 — 좌표가 있을 때만 호출(독립 폴백, 살포 결과 표시를 막지 않음).
+  // 훅은 조건부 return 위에서 항상 호출되어야 함(React 규칙).
+  const wi = result?.weatherInput;
+  const [weather, setWeather] = useState(null); // null=미요청 / {loading} / 결과 / {error}
+  useEffect(() => {
+    let cancelled = false;
+    if (!wi || !Number.isFinite(wi.lat) || !Number.isFinite(wi.lng)) {
+      setWeather(null);
+      return;
+    }
+    setWeather({ loading: true });
+    fetchWeatherWindow({ lat: wi.lat, lng: wi.lng, inoculantType: wi.inoculantType, safeDate: wi.safeDate }).then(
+      (w) => {
+        if (!cancelled) setWeather(w);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [wi?.lat, wi?.lng, wi?.inoculantType, wi?.safeDate]);
+
   if (!result) return null;
 
   if (result.error) {
@@ -1449,6 +1556,56 @@ export function CheckResultScreen({ result, onBack }) {
                 )}
               </div>
             </div>
+
+            {/* 🌤️ 최적 살포일 — 기상 적용창(타이밍 보조). 좌표 없으면 안내만, 실패해도 본체 영향 없음 */}
+            {wi && Number.isFinite(wi.lat) && Number.isFinite(wi.lng) ? (
+              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 text-sm">
+                <p className="font-bold text-stone-800 mb-1.5">🌤️ 최적 살포일</p>
+                {!weather || weather.loading ? (
+                  <p className="text-xs text-stone-400">날씨 적기를 확인하는 중...</p>
+                ) : weather.error ? (
+                  <p className="text-xs text-stone-400">날씨 정보를 불러오지 못했어요.</p>
+                ) : (
+                  <>
+                    {weather.recommendDate ? (
+                      <p className="font-semibold text-stone-800">
+                        📅 {weather.recommendDate}
+                        {weather.timeOfDay ? ` ${weather.timeOfDay}` : ""} 살포 권장
+                        <span className="block text-xs font-normal text-emerald-700 mt-0.5">농약 안전 + 날씨 적합</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        {weather.reason || "예보 범위(~3일) 안에 조건이 맞는 적용일을 찾지 못했어요."}
+                      </p>
+                    )}
+                    {weather.safeDate && (
+                      <p className="text-[11px] text-stone-400 mt-1.5">
+                        농약이 풀리는 {weather.safeDate} 이후, 날씨가 좋은 날을 골랐어요.
+                      </p>
+                    )}
+                    {Array.isArray(weather.perDay) && weather.perDay.length > 0 && (
+                      <div className="mt-2.5 space-y-1">
+                        {weather.perDay.map((d, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span
+                              className={`inline-block h-2 w-2 rounded-full shrink-0 ${
+                                d.level === "good" ? "bg-emerald-500" : d.level === "bad" ? "bg-rose-400" : "bg-stone-300"
+                              }`}
+                            />
+                            <span className="text-stone-600 shrink-0">{d.date}</span>
+                            <span className="text-stone-400 truncate">{d.reasons?.[0] || ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 text-xs text-stone-500 leading-relaxed">
+                🌤️ 농경지 주소를 입력하면 날씨까지 고려한 살포 적기를 알려드려요.
+              </div>
+            )}
 
             {/* 왜 이렇게 안내했나요 — 기존 governingMaterial 값으로 서사 설명(새 필드 없음) */}
             {g && (

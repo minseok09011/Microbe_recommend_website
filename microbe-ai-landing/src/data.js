@@ -99,6 +99,24 @@ export async function searchAddress(query) {
   }
 }
 
+// address 객체(또는 주소문자열 포함)에서 lat/lng 확보. 있으면 그대로, 없으면 카카오 지오코딩.
+// 실패 시 null(좌표 못 구함). 기상 적용창(weatherWindow)·추천 좌표 공용.
+export async function resolveLatLng(address) {
+  const lat = address?.lat;
+  const lng = address?.lng;
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  const text = address?.address || address?.roadAddr || address?.jibunAddr || "";
+  if (!text) return null;
+  try {
+    const hits = await kakaoGeocode(text);
+    if (!hits.length) return null;
+    return { lat: hits[0].lat, lng: hits[0].lng };
+  } catch (e) {
+    console.warn("[TOBio] 좌표 변환 실패:", e.message);
+    return null;
+  }
+}
+
 /* ── 관측소 매칭 (하버사인) ────────────────────────────────── */
 import { AGRI_STATIONS } from "./agriStations.js";
 
@@ -299,6 +317,25 @@ export async function fetchRecommend(crop, purpose, address, onStatus) {
   } catch (e) {
     console.warn("[TOBio] 추천 파이프라인 실패:", e.message);
     return { error: e.message || "네트워크 오류가 발생했습니다." };
+  }
+}
+
+/* ── 기상 적용창 (최적 살포일) ────────────────────────────── */
+// 백엔드 /api/weatherWindow — 좌표·균종·살포안전일로 향후 ~3일 적용 적기 계산.
+// 기상은 타이밍 보조라, 실패해도 살포 결과 본체를 막지 않게 { error } 만 반환.
+export async function fetchWeatherWindow({ lat, lng, inoculantType, safeDate }) {
+  try {
+    const params = new URLSearchParams({ lat, lng, inoculantType: inoculantType || "both" });
+    if (safeDate) params.set("safeDate", safeDate);
+    const res = await fetch(`${API_BASE_URL}/api/weatherWindow?${params}`, {
+      signal: AbortSignal.timeout(20000),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `요청 실패 (HTTP ${res.status})`);
+    return json;
+  } catch (e) {
+    console.warn("[TOBio] 기상 적용창 실패:", e.message);
+    return { error: e.message || "기상 정보를 가져오지 못했습니다." };
   }
 }
 

@@ -82,7 +82,7 @@ export default function App() {
     const top = microbes?.[0];
     const microbeName = top?.name || top?.korName || top?.korean_name || top?.species || "";
     const cropName = CROPS.find((c) => c.id === crop)?.name || crop || "";
-    setCheckPrefill({ microbe: microbeName, crop: cropName });
+    setCheckPrefill({ microbe: microbeName, crop: cropName, address });
     setView("check");
   }
 
