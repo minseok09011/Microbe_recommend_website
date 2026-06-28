@@ -62,7 +62,18 @@ export async function signOut() {
   if (supabase) await supabase.auth.signOut();
 }
 
-// 비밀번호 찾기 1단계: 가입된 이메일로 6자리 인증번호 발송
+// 비밀번호 찾기 전: 가입된 이메일인지 서버(check-email-exists Edge Function)에 확인.
+// anon 키로는 계정 존재 여부를 알 수 없어서(보안상 의도된 제한) 별도 함수가 필요.
+export async function checkEmailRegistered(email) {
+  ensure();
+  const { data, error } = await supabase.functions.invoke("check-email-exists", {
+    body: { email: email.trim() },
+  });
+  if (error) throw error;
+  return Boolean(data?.exists);
+}
+
+// 비밀번호 찾기 1단계: 가입된 이메일로 8자리 인증번호 발송
 export async function requestPasswordReset(email) {
   ensure();
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim());

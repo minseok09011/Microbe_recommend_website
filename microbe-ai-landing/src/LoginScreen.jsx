@@ -5,6 +5,7 @@ import {
   signIn,
   signUp,
   normalizeUser,
+  checkEmailRegistered,
   requestPasswordReset,
   verifyResetCode,
   updatePassword,
@@ -109,6 +110,16 @@ export default function LoginScreen({ onBack, onLogin }) {
     }
     setBusy(true);
     try {
+      let registered = true;
+      try {
+        registered = await checkEmailRegistered(id);
+      } catch {
+        registered = true; // 확인 함수 자체가 실패하면 발송 자체는 막지 않음
+      }
+      if (!registered) {
+        setError("가입되지 않은 이메일입니다. 이메일을 다시 확인해주세요.");
+        return;
+      }
       await requestPasswordReset(id);
       setResetCode("");
       setResendCooldown(60); // 재전송은 1분에 한 번만

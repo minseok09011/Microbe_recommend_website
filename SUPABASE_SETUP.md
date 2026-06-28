@@ -143,6 +143,24 @@ supabase functions deploy create-farmer
 
 ---
 
+## 3-1. 비밀번호 찾기용 이메일 가입 확인 Edge Function 배포
+
+비밀번호 찾기 화면에서 "가입되지 않은 이메일입니다"를 보여주려면, 가입 여부를
+확인하는 **Edge Function(`check-email-exists`)** 을 배포해야 합니다(anon 키로는
+계정 존재 여부를 알 수 없도록 Supabase가 막아놔서, secret 키로 동작하는 서버
+함수가 필요합니다).
+
+```bash
+# Supabase CLI 설치 + 로그인 + 프로젝트 연결까지 했다면(3번과 동일)
+supabase functions deploy check-email-exists
+```
+
+- 이 함수를 배포하지 않으면, 비밀번호 찾기는 **기존처럼(가입 여부 확인 없이) 그냥
+  동작**합니다(앱 코드가 함수 호출 실패를 무시하고 발송을 진행하도록 만들어둠).
+  즉 필수는 아니지만, 배포해야 "가입되지 않은 이메일입니다" 안내가 나옵니다.
+
+---
+
 ## 4. 테스트 계정 예시
 
 | 구분 | 아이디 | 로그인 이메일(내부) | 비밀번호 | role |
