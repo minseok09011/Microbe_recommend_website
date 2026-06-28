@@ -686,6 +686,48 @@ function buildFarmStatsKorean(data) {
         .join(", ");
 }
 
+// 첫 '{'부터 짝이 맞는 마지막 '}'까지만 잘라낸다(문자열·이스케이프 고려).
+// 닫는 괄호를 못 찾으면(잘린 응답) 시작부터 끝까지 반환 → 파싱 단계에서 실패해 재시도로 이어진다.
+function extractBalancedJsonObject(text) {
+    const start = text.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (inStr) {
+            if (esc) esc = false;
+            else if (ch === "\\") esc = true;
+            else if (ch === '"') inStr = false;
+        } else if (ch === '"') {
+            inStr = true;
+        } else if (ch === "{") {
+            depth++;
+        } else if (ch === "}") {
+            depth--;
+            if (depth === 0) return text.slice(start, i + 1);
+        }
+    }
+    return text.slice(start);
+}
+
+// LLM이 준 텍스트에서 JSON 객체만 뽑아 파싱한다.
+// 코드펜스(```json ... ```), 앞뒤 잡텍스트, 트레일링 콤마 같은 흔한 깨짐을 보정한다.
+// 보정 후에도 유효하지 않으면 throw → 호출부에서 재생성 재시도.
+function parseLlmJson(raw) {
+    if (!raw || !String(raw).trim()) throw new Error("빈 응답");
+    const stripped = String(raw)
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+    const block = extractBalancedJsonObject(stripped);
+    if (!block) throw new Error("응답에서 JSON 객체를 찾을 수 없음");
+    // 객체/배열 끝의 트레일링 콤마 제거: ", }" / ", ]"
+    const cleaned = block.replace(/,(\s*[}\]])/g, "$1");
+    return JSON.parse(cleaned);
+}
+
 async function generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies) {
     const sourcesText = sourceChunks
         .map((c, i) => `[${i + 1}] ${c.title} (${c.journal}, ${c.year})\n${c.text.slice(0, 800)}`)
@@ -744,9 +786,14 @@ ${candidateList}
     const text = data2?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error(JSON.stringify(data2));
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("LLM 응답에서 JSON을 찾을 수 없음: " + text);
-    return JSON.parse(jsonMatch[0]);
+    try {
+        return parseLlmJson(text);
+    } catch (e) {
+        // 파싱 실패는 재생성으로 회복 가능하므로 플래그를 달아 호출부가 재시도하게 한다.
+        const err = new Error("LLM JSON 파싱 실패: " + e.message);
+        err.parseFailed = true;
+        throw err;
+    }
 }
 
 // 근거 강도 등급 — 최고 유사도(topScore) 기준 임계값 매핑.
@@ -810,7 +857,30 @@ app.get("/api/recommendMicrobe", rateLimit, async (req, res) => {
         const candidateSpecies = getRecommendableSpecies(true); // 토양추천: soil_improvement 종 우선
         const candidateKeySet = getRecommendableKeySet(true);
 
-        const result = await generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies);
+        // Gemini가 가끔 깨진 JSON을 주므로, 파싱 실패 시 최대 2회까지 재생성한다.
+        // (정상 JSON은 첫 시도에 통과 — 기존 동작 영향 없음)
+        let result = null;
+        let lastParseError = null;
+        const MAX_ATTEMPTS = 3; // 최초 1회 + 재시도 2회
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                result = await generateRecommendation(crop, data, queryText, sourceChunks, candidateSpecies);
+                break;
+            } catch (e) {
+                if (e.parseFailed) {
+                    lastParseError = e;
+                    console.warn(`⚠️ Gemini JSON 파싱 실패 (시도 ${attempt}/${MAX_ATTEMPTS}): ${e.message}`);
+                    continue; // 재생성
+                }
+                throw e; // 쿼터 초과·네트워크 등은 아래 catch에서 기존대로 처리
+            }
+        }
+        if (!result) {
+            // 모든 재시도 후에도 파싱 실패 → 500 대신 프론트가 그대로 보여줄 친화 메시지(502)
+            console.error("❌ Gemini JSON 재시도 모두 실패:", lastParseError?.message);
+            return res.status(502).json({ error: "추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요." });
+        }
+
         const explanation = result.explanation;
         const scientificEvidence = result.scientificEvidence;
         let recommendedSpecies = Array.isArray(result.recommendedSpecies) ? result.recommendedSpecies : [];
