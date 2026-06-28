@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import TobioActionBubble from "./TobioActionBubble.jsx";
 
 /* ──────────────────────────────────────────────────────────────
    로그인 화면 왼쪽 패널(밭 사진, 가운데 길)을 꾸미는 토비오 애니메이션.
    - "approach": 길 안쪽 먼 곳에서 점점 커지며 걸어 내려옴(원근감).
    - "inspect"/"sniff"/"listen": 길 가운데서 멈춰 돋보기로 살피고,
-     냄새를 맡고, 소리를 듣는 모습을 말풍선 이모지로 표현.
+     냄새를 맡고, 소리를 듣는 모습 — tobio-inspect/sniff/listen.png 실제 포즈 이미지.
    - "depart": 다시 걸어서 화면 아래(시점 가까이)로 사라짐.
-   tobio-walk-1~4.png, tobio.png는 기존 로딩화면과 같은 에셋을 재사용.
+   tobio-walk-1~4.png와 tobio-inspect/sniff/listen.png는 모두 토비오 원본 디자인
+   시트에서 잘라낸 동일 캐릭터 에셋.
 ────────────────────────────────────────────────────────────── */
 const PHASES = ["approach", "inspect", "sniff", "listen", "depart", "pause"];
 const DURATIONS = [5500, 2200, 1800, 1800, 3000, 2500]; // ms, PHASES와 같은 순서
@@ -78,10 +78,10 @@ export default function TobioMascot() {
 
       {(current === "inspect" || current === "sniff" || current === "listen") && (
         <div key={phase} className="absolute" style={idleStyle}>
-          <img src="img/tobio.png" alt="" className="tobio-idle-img tobio-edge-clean h-24 w-auto object-contain drop-shadow-lg" />
-          <TobioActionBubble
-            emoji={current === "inspect" ? "🔍" : current === "sniff" ? "🌸" : "🎵"}
-            style={{ top: "-12px", right: "-10px" }}
+          <img
+            src={`img/tobio-${current}.png`}
+            alt=""
+            className="tobio-idle-img tobio-edge-clean h-24 w-auto object-contain drop-shadow-lg"
           />
         </div>
       )}

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import TobioActionBubble from "./TobioActionBubble.jsx";
 
 /* ──────────────────────────────────────────────────────────────
    메인 페이지 "OUR SOLUTION" 섹션 하단의 빈 공간을 채우는 장식 애니메이션.
@@ -85,14 +84,12 @@ export default function TobioRoamer() {
 
       {current === "sniff" && (
         <div key={phase} className="absolute bottom-2" style={{ left: "38%" }}>
-          <img src="img/tobio.png" alt="" className="tobio-roam-idle tobio-edge-clean h-20 w-auto object-contain" />
-          <TobioActionBubble emoji="🌸" style={{ top: "-14px", right: "-6px" }} />
+          <img src="img/tobio-sniff.png" alt="" className="tobio-roam-idle tobio-edge-clean h-20 w-auto object-contain" />
         </div>
       )}
       {current === "listen" && (
         <div key={phase} className="absolute bottom-2" style={{ left: "68%" }}>
-          <img src="img/tobio.png" alt="" className="tobio-roam-idle tobio-edge-clean h-20 w-auto object-contain" />
-          <TobioActionBubble emoji="🎵" style={{ top: "-14px", right: "-6px" }} />
+          <img src="img/tobio-listen.png" alt="" className="tobio-roam-idle tobio-edge-clean h-20 w-auto object-contain" />
         </div>
       )}
     </div>
