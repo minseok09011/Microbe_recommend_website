@@ -125,6 +125,60 @@ const NEED_LABEL = { disease: "병 막기", growth: "잘 자라게 하기" };
    ------------------------------------------------------------ */
 const RECOMMEND_BACKEND_BASE_URL = "https://microbe-recommend-website.onrender.com";
 
+/* ------------------------------------------------------------
+   cold-start 대기 헬퍼 — 백엔드는 Render 무료 인스턴스라 (1) 새벽엔 잠들어 있고
+   (2) 깨어날 때 spin-up(약 1분) + 논문 인덱스(367MB) 로드 전까지 503 을 준다.
+   503/네트워크 실패일 때만 /health 를 폴링해 "서버 깨우는 중" 대기 UX 를 보여주고,
+   준비되면 원래 요청을 1회 재시도한다. warm 상태에선 추가 지연이 없어야 한다.
+   ------------------------------------------------------------ */
+
+// /health 를 폴링하며 서버가 깨어날 때까지 대기. 성공 시 true, 시간초과 시 false.
+async function wakeBackend(statusEl, { requireIndex } = {}) {
+    const MAX_TRIES = 18;       // 5초 간격 × 18 ≈ 90초
+    const INTERVAL_MS = 5000;
+    const startedAt = Date.now();
+
+    for (let i = 0; i < MAX_TRIES; i++) {
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        if (statusEl) {
+            statusEl.innerHTML = `<p class="notice">☕ 서버를 깨우는 중입니다… (최대 1~2분, 새벽엔 더 걸릴 수 있어요) — ${elapsed}초</p>`;
+        }
+
+        try {
+            const res = await fetch(`${RECOMMEND_BACKEND_BASE_URL}/health`);
+            if (res.ok) {
+                if (!requireIndex) return true;            // 200 만으로 충분
+                let body = {};
+                try { body = await res.json(); } catch (e) { body = {}; }
+                if (body.paperIndexLoaded === true) return true;   // 인덱스 로드까지 확인
+            }
+        } catch (e) {
+            // fetch 가 네트워크로 throw 나도(아직 깨는 중) 폴링은 계속한다.
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+    }
+    return false;
+}
+
+// 먼저 일반 fetch 시도(warm 이면 즉시 통과). 503 이거나 네트워크 실패(TypeError)면
+// wakeBackend 로 서버를 깨운 뒤 원래 요청을 1회 재시도한다.
+async function fetchWithWake(url, options, statusEl, { requireIndex } = {}) {
+    try {
+        const res = await fetch(url, options);
+        if (res.status !== 503) return res;     // warm: 추가 지연 없이 그대로 반환
+        // 503(인덱스 로딩 중) → 아래에서 깨우고 재시도
+    } catch (err) {
+        if (!(err instanceof TypeError)) throw err;   // 네트워크 실패만 wake 대상
+    }
+
+    const awake = await wakeBackend(statusEl, { requireIndex });
+    if (!awake) {
+        throw new Error("서버가 깨어나는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.");
+    }
+    return fetch(url, options);     // 깨어난 뒤 원래 요청 1회 재시도
+}
+
 async function renderRecommendResult() {
     const crop = localStorage.getItem("userCrop") || "tomato";
     const address = localStorage.getItem("userAddress") || "";
@@ -161,7 +215,7 @@ async function renderRecommendResult() {
     });
 
     try {
-        const res = await fetch(`${RECOMMEND_BACKEND_BASE_URL}/api/recommendMicrobe?${params}`);
+        const res = await fetchWithWake(`${RECOMMEND_BACKEND_BASE_URL}/api/recommendMicrobe?${params}`, undefined, resultEl, { requireIndex: true });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "추천 요청 중 오류가 발생했습니다.");
 
@@ -245,7 +299,10 @@ async function renderRecommendResult() {
         }
     } catch (error) {
         console.error(error);
-        resultEl.innerHTML = `<p class="notice">⚠️ ${error.message}</p>`;
+        const msg = (error instanceof TypeError || /Failed to fetch/i.test(error.message || ""))
+            ? "서버에 연결하지 못했어요. 인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요."
+            : error.message;
+        resultEl.innerHTML = `<p class="notice">⚠️ ${msg}</p>`;
     }
 }
 
@@ -292,7 +349,7 @@ async function renderSprayResult() {
     resultEl.innerHTML = `<p class="notice">🧮 안전한 살포 시점을 계산하는 중입니다...</p>`;
 
     try {
-        const res = await fetch(`${RECOMMEND_BACKEND_BASE_URL}/api/spraySequence`, {
+        const res = await fetchWithWake(`${RECOMMEND_BACKEND_BASE_URL}/api/spraySequence`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -304,7 +361,7 @@ async function renderSprayResult() {
                 lng: loc.lng || undefined,
                 obsrSpotCd: loc.obsrSpotCd || undefined,
             }),
-        });
+        }, resultEl, { requireIndex: false });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "살포 시퀀스 계산 중 오류가 발생했습니다.");
 
@@ -371,6 +428,9 @@ async function renderSprayResult() {
         `;
     } catch (error) {
         console.error(error);
-        resultEl.innerHTML = `<p class="notice">⚠️ ${error.message}</p>`;
+        const msg = (error instanceof TypeError || /Failed to fetch/i.test(error.message || ""))
+            ? "서버에 연결하지 못했어요. 인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요."
+            : error.message;
+        resultEl.innerHTML = `<p class="notice">⚠️ ${msg}</p>`;
     }
 }
