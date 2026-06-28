@@ -251,7 +251,7 @@ export function AddressInput({ address, onSelect, onBack, onNext, onManualSoil, 
           <input
             value={query}
             onChange={handleInput}
-            placeholder="지번 또는 도로명 주소 입력 (예: 충남 아산시 배방읍)"
+            placeholder="지번 또는 도로명 주소 입력 (예: 전남 화순군 도암면 왕정리 441-3)"
             autoComplete="off"
             className={`w-full rounded-xl border-2 px-4 py-3.5 text-sm outline-none transition-colors ${
               address ? "border-emerald-600" : "border-stone-200 focus:border-emerald-500"
@@ -1388,7 +1388,7 @@ export function CheckScreen({ prefill, onBack, onResult }) {
               <input
                 value={inoculantName}
                 onChange={handleInoculantNameChange}
-                placeholder="예: 트리코더마, Bacillus subtilis, OO미생물제"
+                placeholder="예: 트리코마, Bacillus subtilis, OO미생물제"
                 autoComplete="off"
                 className="w-full rounded-md border border-stone-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
               />
