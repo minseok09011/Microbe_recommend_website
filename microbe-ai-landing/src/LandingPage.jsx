@@ -399,9 +399,9 @@ function ServiceShowcase() {
               <p className="text-amber-500 text-xs">★★★★</p>
             </div>
           </div>
-          <div className="bg-emerald-50 rounded-lg p-2.5">
-            <p className="text-[10px] font-bold text-emerald-800 mb-1">상황 설명</p>
-            <p className="text-[9px] text-emerald-700 leading-relaxed">현재 농경지는 산성 토양인 데다 수분이 부족하고 기온이 높아...</p>
+          <div className="bg-emerald-50 rounded-lg p-3.5">
+            <p className="text-[10px] font-bold text-emerald-800 mb-1.5">상황 설명</p>
+            <p className="text-[9px] text-emerald-700 leading-relaxed">내 밭의 토양 산도, 유기물, 수분, 기온 등을 종합 분석하여 전문 용어 없이 농민이 바로 이해할 수 있는 쉬운 말로 설명해드립니다. 논문 근거가 필요하면 "더보기"에서 학술 인용까지 확인할 수 있어요.</p>
           </div>
         </div>
       ),
@@ -423,10 +423,10 @@ function ServiceShowcase() {
           </div>
           <p className="text-[10px] font-bold text-stone-500 mb-2">구매 가능 판매처 (2곳)</p>
           {[
-            { name: "씨엠씨코리아", product: "토토빈(토양미생물제제)", price: "8,000원/500g", tel: "042-671-3378" },
-            { name: "천지인바이오텍", product: "큰대감(미생물)", price: "25,000원/500mL", tel: "033-554-4416" },
+            { name: "XXX코리아", product: "토양미생물제제", price: "8,000원/500g", tel: "042-000-0000" },
+            { name: "XXX바이오텍", product: "미생물 제제", price: "25,000원/500mL", tel: "033-000-0000" },
           ].map((v) => (
-            <div key={v.name} className="border-l-4 border-l-amber-400 border border-stone-200 rounded-r-lg px-2.5 py-2 mb-1.5 bg-stone-50">
+            <div key={v.name} className="border-l-4 border-l-amber-400 border border-stone-200 rounded-r-lg px-2.5 py-2 mb-3 bg-stone-50">
               <p className="text-xs font-bold text-stone-800">{v.name}</p>
               <p className="text-[9px] text-stone-500">{v.product}</p>
               <p className="text-[9px] text-stone-500">{v.price}</p>
