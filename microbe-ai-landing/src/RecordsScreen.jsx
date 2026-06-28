@@ -5,15 +5,15 @@ import { listMyRecords } from "./records.js";
 /* “내 기록” 목록 (최소 범위: 저장한 추천/살포 결과를 다시 보기) */
 export default function RecordsScreen({ onBack, onSelect }) {
   const [rows, setRows] = useState(null); // null=로딩, []=비어있음
-  const [err, setErr] = useState(“”);
-  const [filter, setFilter] = useState(“all”); // all | recommend | spray
+  const [err, setErr] = useState("");
+  const [filter, setFilter] = useState("all"); // all | recommend | spray
 
   useEffect(() => {
     listMyRecords()
       .then((data) => {
         const seen = new Set();
         const deduped = data.filter((r) => {
-          const key = `${r.kind}||${r.crop || “”}||${r.summary || “”}`;
+          const key = `${r.kind}||${r.crop || ""}||${r.summary || ""}`;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -21,38 +21,38 @@ export default function RecordsScreen({ onBack, onSelect }) {
         setRows(deduped);
       })
       .catch((e) => {
-        setErr(e?.message || “기록을 불러오지 못했습니다.”);
+        setErr(e?.message || "기록을 불러오지 못했습니다.");
         setRows([]);
       });
   }, []);
 
-  const filtered = rows?.filter((r) => filter === “all” || r.kind === filter);
+  const filtered = rows?.filter((r) => filter === "all" || r.kind === filter);
   const TABS = [
-    { id: “all”, label: “전체” },
-    { id: “recommend”, label: “미생물 추천” },
-    { id: “spray”, label: “살포 확인” },
+    { id: "all", label: "전체" },
+    { id: "recommend", label: "미생물 추천" },
+    { id: "spray", label: "살포 확인" },
   ];
 
   return (
-    <div className=”min-h-screen bg-stone-50 flex flex-col”>
-      <header className=”bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3”>
-        <button onClick={onBack} className=”text-stone-500 hover:text-stone-800” aria-label=”홈으로”>
-          <ArrowLeft className=”h-5 w-5” />
+    <div className="min-h-screen bg-stone-50 flex flex-col">
+      <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3">
+        <button onClick={onBack} className="text-stone-500 hover:text-stone-800" aria-label="홈으로">
+          <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className=”font-bold text-emerald-800”>📒 내 기록</h1>
+        <h1 className="font-bold text-emerald-800">📒 내 기록</h1>
       </header>
 
-      <div className=”flex-1 max-w-lg w-full mx-auto px-5 py-6”>
+      <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
         {/* 필터 탭 */}
-        <div className=”flex gap-2 mb-4”>
+        <div className="flex gap-2 mb-4">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setFilter(t.id)}
               className={`px-4 py-2 rounded-full text-xs font-bold transition-colors ${
                 filter === t.id
-                  ? “bg-emerald-700 text-white”
-                  : “bg-white border border-stone-200 text-stone-600 hover:border-emerald-300”
+                  ? "bg-emerald-700 text-white"
+                  : "bg-white border border-stone-200 text-stone-600 hover:border-emerald-300"
               }`}
             >
               {t.label}
@@ -60,21 +60,21 @@ export default function RecordsScreen({ onBack, onSelect }) {
           ))}
         </div>
 
-        {rows === null && <p className=”text-center text-stone-500 py-10”>불러오는 중…</p>}
+        {rows === null && <p className="text-center text-stone-500 py-10">불러오는 중…</p>}
 
         {err && (
-          <p className=”text-center text-sm text-rose-600 py-4”>⚠️ {err}</p>
+          <p className="text-center text-sm text-rose-600 py-4">⚠️ {err}</p>
         )}
 
         {filtered && filtered.length === 0 && !err && (
-          <div className=”text-center py-16 text-stone-500”>
-            <FileText className=”h-12 w-12 mx-auto mb-3 text-stone-300” />
-            <p className=”font-semibold mb-1”>아직 저장한 기록이 없어요</p>
-            <p className=”text-sm text-stone-400”>추천·살포 결과 화면에서 “내 기록에 저장”을 눌러보세요.</p>
+          <div className="text-center py-16 text-stone-500">
+            <FileText className="h-12 w-12 mx-auto mb-3 text-stone-300" />
+            <p className="font-semibold mb-1">아직 저장한 기록이 없어요</p>
+            <p className="text-sm text-stone-400">추천·살포 결과 화면에서 “내 기록에 저장”을 눌러보세요.</p>
           </div>
         )}
 
-        <div className=”space-y-3”>
+        <div className="space-y-3">
           {filtered?.map((r) => {
             const isSpray = r.kind === "spray";
             return (
