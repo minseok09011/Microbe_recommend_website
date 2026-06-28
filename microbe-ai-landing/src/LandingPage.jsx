@@ -478,7 +478,7 @@ function ServiceShowcase() {
         </Reveal>
 
         <Reveal delay={100}>
-          <div className="max-w-sm mx-auto" style={{ minHeight: 560 }}>
+          <div className="max-w-sm mx-auto" style={{ minHeight: 480 }}>
             <div
               style={{
                 opacity: phase === "visible" || phase === "fadeIn" ? 1 : 0,
