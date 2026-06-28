@@ -1536,7 +1536,7 @@ export function CheckResultScreen({ result, onBack }) {
               <img
                 src={safe ? "img/tobio.png" : "img/토피오 펫말세모.png"}
                 alt=""
-                className="absolute -right-2 -bottom-4 h-32 w-auto object-contain opacity-90"
+                className="absolute -right-2 -bottom-12 h-40 w-auto object-contain opacity-90"
               />
               <div className="relative">
                 <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/80 mb-2">
