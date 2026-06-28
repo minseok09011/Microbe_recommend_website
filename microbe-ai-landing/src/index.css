@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 숫자+단위(예: "0일") 사이나 어절 중간에서 줄바꿈되는 것을 막음 — 공백 기준으로만 줄바꿈 */
+body {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 @keyframes tobio-walk-bob {
   0%, 100% { transform: translateX(-50%) translateY(0); }
   50% { transform: translateX(-50%) translateY(-4px); }

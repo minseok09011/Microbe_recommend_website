@@ -17,6 +17,7 @@ import {
   Sun,
   ChevronDown,
   Lightbulb,
+  ExternalLink,
 } from "lucide-react";
 import {
   CROPS,
@@ -1054,6 +1055,11 @@ export function ResultScreen({ result, crop, purpose, address, onCheck, onHome }
    백엔드 /api/spraySequence 로 안전 살포일을 계산한다.
 ────────────────────────────────────────────────────────────── */
 const RISK_LABEL = { "🔴": "위험", "🟡": "주의", "🟢": "안전" };
+const RISK_STYLE = {
+  "🔴": { label: "위험", dot: "bg-rose-500", text: "text-rose-700", chip: "bg-rose-50 text-rose-700", ring: "bg-rose-50 ring-rose-200", Icon: AlertTriangle },
+  "🟡": { label: "주의", dot: "bg-amber-500", text: "text-amber-700", chip: "bg-amber-50 text-amber-700", ring: "bg-amber-50 ring-amber-200", Icon: AlertTriangle },
+  "🟢": { label: "안전", dot: "bg-emerald-500", text: "text-emerald-700", chip: "bg-emerald-50 text-emerald-700", ring: "bg-emerald-50 ring-emerald-200", Icon: CheckCircle2 },
+};
 
 function todayStr() {
   const n = new Date();
@@ -1623,44 +1629,59 @@ export function CheckResultScreen({ result, onBack }) {
               </div>
             )}
 
-            {/* 발목 잡는 자재 */}
-            {g && (
-              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 text-sm">
-                <p className="font-semibold text-stone-700 mb-1">가장 영향이 큰 자재</p>
-                <p className="text-stone-700">
-                  {g.risk} <strong>{g.name}</strong>
-                  {g.family ? ` (${g.family})` : ""} — {g.appliedDate} 살포, 권장 간격 약 {g.term}일
-                </p>
-                {g.source && (
-                  <a
-                    href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${g.source}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-emerald-700 underline"
-                  >
-                    근거 논문 보기 ({g.source})
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* 자재별 내역 */}
-            {Array.isArray(result.perMaterial) && result.perMaterial.length > 0 && (
-              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4">
-                <p className="text-xs font-bold text-stone-500 mb-2">자재별 안전 해제일</p>
-                <div className="space-y-1.5">
-                  {result.perMaterial.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-stone-700">
-                        {m.risk} {m.name}
-                        {m.family ? <span className="text-stone-400"> · {m.family}</span> : null}
-                      </span>
-                      <span className="text-stone-500">{m.clearDate} ({RISK_LABEL[m.risk] || ""}, {m.term}일)</span>
-                    </div>
-                  ))}
+            {/* 자재별 안전 해제일 — 발목 잡는 자재를 목록 안에서 강조 표시(별도 카드로 분리하지 않음) */}
+            {Array.isArray(result.perMaterial) && result.perMaterial.length > 0 && (() => {
+              let governingMarked = false;
+              return (
+                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4">
+                  <p className="text-xs font-bold text-stone-500 mb-2">자재별 안전 해제일</p>
+                  <div className="divide-y divide-stone-100">
+                    {result.perMaterial.map((m, i) => {
+                      const ms = RISK_STYLE[m.risk] || RISK_STYLE["🟡"];
+                      const isGoverning =
+                        !governingMarked &&
+                        g &&
+                        m.name === g.name &&
+                        m.appliedDate === g.appliedDate &&
+                        m.term === g.term;
+                      if (isGoverning) governingMarked = true;
+                      return (
+                        <div key={i} className="py-2.5 first:pt-0 last:pb-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`h-2 w-2 rounded-full shrink-0 ${ms.dot}`} />
+                            <span className="text-sm font-medium text-stone-800">
+                              {m.name}
+                              {m.family && <span className="font-normal text-stone-400"> · {m.family}</span>}
+                            </span>
+                          </div>
+                          <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
+                            <span className="text-[11px] text-stone-400 whitespace-nowrap">{ms.label} · {m.term}일</span>
+                            <span className="text-sm font-semibold text-stone-800 whitespace-nowrap">{m.clearDate}</span>
+                          </div>
+                          {isGoverning && (
+                            <div className="mt-1.5 ml-3.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="inline-flex rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500 whitespace-nowrap">
+                                가장 큰 영향
+                              </span>
+                              {g.source && (
+                                <a
+                                  href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${g.source}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 hover:text-emerald-800 whitespace-nowrap"
+                                >
+                                  근거 논문 보기 ({g.source}) <ExternalLink size={11} />
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* 구리 누적 경고 */}
             {result.copperWarning?.flag && (
