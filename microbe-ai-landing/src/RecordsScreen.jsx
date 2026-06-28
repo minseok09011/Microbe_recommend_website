@@ -100,7 +100,7 @@ export default function RecordsScreen({ onBack, onSelect }) {
                   disabled={!onSelect || !r.payload}
                   className="block w-full text-left disabled:cursor-default"
                 >
-                  <div className="flex items-center justify-between mb-1 pr-8">
+                  <div className="mb-1">
                     <span
                       className={`inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-0.5 ${
                         isSpray ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
@@ -109,18 +109,20 @@ export default function RecordsScreen({ onBack, onSelect }) {
                       {isSpray ? <FlaskConical className="h-3 w-3" /> : <Sprout className="h-3 w-3" />}
                       {isSpray ? "살포 확인" : "미생물 추천"}
                     </span>
-                    <span className="text-xs text-stone-400">{(r.created_at || "").slice(0, 10)}</span>
                   </div>
                   <p className="font-semibold text-stone-800">{r.title || (isSpray ? "살포 확인 결과" : "추천 결과")}</p>
                   {r.crop && <p className="text-xs text-stone-500 mt-0.5">작물: {r.crop}</p>}
                   {r.payload?.address && <p className="text-xs text-stone-500 mt-0.5">지역: {r.payload.address}</p>}
                   {r.summary && <p className="text-sm text-stone-600 mt-1 leading-relaxed">{r.summary}</p>}
-                  {r.payload && <p className="text-xs text-emerald-600 font-semibold mt-2">결과 다시 보기 &rarr;</p>}
+                  <div className="flex items-center justify-between mt-2">
+                    {r.payload && <p className="text-xs text-emerald-600 font-semibold">결과 다시 보기 &rarr;</p>}
+                    <span className="text-xs text-stone-400 ml-auto">{(r.created_at || "").slice(0, 10)}</span>
+                  </div>
                 </button>
                 <button
                   onClick={(e) => handleDelete(e, r.id)}
                   disabled={deleting === r.id}
-                  className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                  className="absolute top-2.5 right-2.5 p-1.5 rounded-lg text-stone-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
                   aria-label="삭제"
                 >
                   <Trash2 className="h-4 w-4" />
