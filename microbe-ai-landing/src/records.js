@@ -134,6 +134,13 @@ export async function saveRecord(rec) {
   return data;
 }
 
+// 기록 삭제 — RLS가 본인 것만 삭제 허용
+export async function deleteRecord(id) {
+  ensure();
+  const { error } = await supabase.from("records").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // 내 기록 목록 (RLS가 본인 것만 반환)
 export async function listMyRecords() {
   if (!supabase) return [];
