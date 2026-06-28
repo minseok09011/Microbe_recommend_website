@@ -1,0 +1,63 @@
+name: keep-render-awake
+
+# Render 무료 인스턴스가 15분 무활동이면 spin down → 다음 접속 때 cold start(약 1분) +
+# 인덱스 367MB 재다운로드로 느려지는 문제 방지용. /health 를 주기적으로 때려서 깨워둔다.
+# 단, 새벽 02:00~07:00(KST)에는 핑을 보내지 않아 그 시간엔 자연스럽게 잠들게 둔다.
+
+on:
+  schedule:
+    # GitHub Actions cron 은 UTC 기준. KST = UTC + 9.
+    # 조용한 시간 02:00~07:00 KST = 17:00~22:00 UTC.
+    # 그래서 UTC 시(hour) 22,23,0~16 에만 10분 간격으로 실행(= 07:00~02:00 KST).
+    - cron: "*/10 0-16,22,23 * * *"
+  workflow_dispatch: {} # Actions 탭에서 수동 실행(테스트)도 가능
+
+# 이전 실행이 아직 돌고 있으면 겹치지 않게(중복 핑 방지)
+concurrency:
+  group: keep-render-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health (새벽 가드 + cold start 관대)
+        env:
+          # 라이브 백엔드 URL. repo Variable RENDER_BACKEND_URL 이 있으면 그걸 쓰고,
+          # 없으면 아래 기본값 사용. (프론트 전체가 이 주소를 호출 중)
+          BACKEND_URL: ${{ vars.RENDER_BACKEND_URL || 'https://microbe-recommend-website.onrender.com' }}
+        run: |
+          set -u
+
+          # ── 2차 방어: 스케줄이 밀려 새벽(02~07 KST)에 실행돼도 핑하지 않음 ──
+          HOUR_KST=$(TZ=Asia/Seoul date +%-H)
+          if [ "$HOUR_KST" -ge 2 ] && [ "$HOUR_KST" -lt 7 ]; then
+            echo "🌙 ${HOUR_KST}시 KST — 조용한 시간이라 핑 생략(인스턴스 자게 둠)"
+            exit 0
+          fi
+
+          echo "☀️  ${HOUR_KST}시 KST — keep-alive 핑: ${BACKEND_URL}/health"
+
+          # cold start 중에는 spin-up(약 1분) + 인덱스 367MB 다운로드가 끝날 때까지
+          # /health 가 200 이어도 paperIndexLoaded:false 일 수 있다. 완전히 준비될 때까지
+          # (최대 ~3분, timeout-minutes 5 안에서) 폴링해 7시 첫 사용자가 503 안 보게 한다.
+          for i in $(seq 1 8); do
+            resp=$(curl -s -m 90 -w $'\n%{http_code}' "${BACKEND_URL}/health" || printf '\n000')
+            code=$(printf '%s' "$resp" | tail -n1)
+            body=$(printf '%s' "$resp" | sed '$d')
+            echo "시도 ${i} → HTTP ${code}  ${body}"
+
+            if [ "$code" = "200" ]; then
+              if printf '%s' "$body" | grep -q '"paperIndexLoaded":true'; then
+                echo "✅ 완전히 준비됨(서버 기동 + 논문 인덱스 로드 완료)"
+                exit 0
+              fi
+              echo "🟡 서버는 떴는데 인덱스 로딩 중 — 잠시 후 재확인"
+            fi
+            sleep 25
+          done
+
+          # cold start 진행 중 503/502/000 은 비정상이 아니므로 워크플로를 실패로 만들지 않는다.
+          echo "⚠️  아직 완전 준비 전(cold start 진행 중일 수 있음). 다음 스케줄에서 재확인."
+          exit 0
