@@ -663,12 +663,14 @@ export function ResultScreen({ result, crop, purpose, address, onCheck, onHome }
               </span>
               <h2 className="font-bold text-lg mb-1">토비오의 미생물 추천</h2>
               <p className="text-sm text-white/85">
-                작물: {cropName}
-                {purposeMeta ? <> &nbsp;|&nbsp; 목적: {purposeMeta.icon} {purposeMeta.name}</> : null}
-                &nbsp;|&nbsp; 농경지: {addrName}
+                작물: {cropName} &nbsp;|&nbsp; 농경지: {addrName}
               </p>
-              {result.landUseType && (
-                <p className="text-xs text-white/70 mt-1">✅ 확인된 농경지: {result.landUseType}</p>
+              {(result.landUseType || purposeMeta) && (
+                <p className="text-xs text-white/70 mt-1">
+                  {result.landUseType && <>✅ 확인된 농경지: {result.landUseType}</>}
+                  {result.landUseType && purposeMeta && <> &nbsp;|&nbsp; </>}
+                  {purposeMeta && <>{purposeMeta.icon} 목적: {purposeMeta.name}</>}
+                </p>
               )}
             </div>
           </div>
@@ -795,6 +797,12 @@ export function ResultScreen({ result, crop, purpose, address, onCheck, onHome }
                       <span className="text-xs font-bold text-white">👍 추천 {i + 1}위</span>
                     )}
                   </div>
+
+                  {isTop && result.evidenceConfidence === "weak" && (
+                    <p className="text-xs text-amber-600 px-4 pt-2 leading-relaxed">
+                      💡 이 작물·목적은 직접 연구가 많지 않아 범용 미생물 위주로 추천했어요
+                    </p>
+                  )}
 
                   <div className="p-5">
                     <div className="font-bold text-xl text-stone-900 italic">{species}</div>
