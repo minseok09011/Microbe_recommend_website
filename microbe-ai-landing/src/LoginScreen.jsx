@@ -184,7 +184,7 @@ export default function LoginScreen({ onBack, onLogin }) {
   return (
     <div className="min-h-screen flex bg-stone-50">
       {/* 왼쪽 비주얼 패널 */}
-      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: "url(img/dan-meyers-IQVFVH0ajag-unsplash.jpg)" }}>
+      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: "url(img/로그인창.jpg)" }}>
         <TobioMascot />
         <div className="relative z-10 m-auto px-10 text-center">
           <h2 className="text-2xl font-bold text-white drop-shadow">TOBio와 함께 건강한 농사</h2>
