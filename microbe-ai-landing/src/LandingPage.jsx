@@ -335,13 +335,13 @@ function CoreFeatures() {
                   <f.icon className="h-8 w-8 text-stone-400" />
                 </div>
                 <div className="p-3">
-                  <div className="flex items-center justify-center gap-2">
+                  <h3 className="text-sm font-semibold text-stone-900 text-center mb-2">{f.title}</h3>
+                  <div className="flex items-center gap-2">
                     <IconBox
                       icon={f.icon}
                       className={`w-8 h-8 bg-gradient-to-br ${f.gradient}`}
                       iconClassName="h-4 w-4 text-white"
                     />
-                    <h3 className="text-sm font-semibold text-stone-900">{f.title}</h3>
                   </div>
                   <div className="overflow-hidden max-h-0 opacity-0 group-hover:max-h-40 group-hover:opacity-100 group-hover:mt-2 transition-all duration-300">
                     <p className="text-stone-500 text-xs leading-relaxed text-center">{f.desc}</p>
