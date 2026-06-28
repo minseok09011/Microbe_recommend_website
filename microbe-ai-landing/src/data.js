@@ -155,37 +155,59 @@ export async function fetchRecommend(crop, address) {
     const awake = await ensureBackendAwake({ requireIndex: true });
     if (!awake) return { error: "서버가 깨어나는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해주세요." };
 
-    // 1) 좌표/법정동코드 확보 (자동완성에서 고른 주소는 이미 있음, 아니면 지오코딩)
-    let lat = address?.lat;
-    let lng = address?.lng;
-    let stdgCd = address?.stdgCd || "";
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      const text = address?.address || address?.roadAddr || address?.jibunAddr || "";
-      if (!text) throw new Error("주소 정보가 없습니다.");
-      const hits = await kakaoGeocode(text);
-      if (!hits.length) throw new Error("주소를 찾을 수 없습니다. 정확한 농경지 주소를 입력해주세요.");
-      ({ lat, lng, stdgCd } = hits[0]);
-    }
-
-    // 2) 최근접 관측소 + 현재 시각
-    const station = nearestStation(lat, lng);
-    const { dateStr, timeStr } = nowDateTime();
-
-    // 3) 토양·기상·농지여부
-    const mergedRes = await fetch(
-      `${API_BASE_URL}/api/getMergedData?stationId=${station.id}&lat=${lat}&lng=${lng}` +
-        `&stdgCd=${encodeURIComponent(stdgCd)}&dateStr=${dateStr}&timeStr=${timeStr}`,
-      { signal: AbortSignal.timeout(20000) }
-    );
-    const env = await mergedRes.json();
-    if (!mergedRes.ok) throw new Error(env.error || "토양·기상 데이터 수집 실패");
-
-    // 4) 등록된 농경지가 아니면(false) 차단. null(확인 실패)은 통과.
-    if (env.isFarmland === false) {
-      return {
-        error:
-          "입력하신 주소는 팜맵에 등록된 농경지가 아닙니다. 실제 농경지 주소인지 확인해주세요.",
+    // 1) 토양·기상·농지여부 확보
+    // - 시설재배 등 직접 입력 모드면 흙토람/팜맵 조회를 생략하고 입력값을 그대로 쓴다.
+    // - 아니면 기존처럼 좌표 확보 → 최근접 관측소 → getMergedData 조회.
+    let env;
+    if (address?.manualSoil) {
+      env = {
+        soilPh: address.soilPh,
+        soilOrganic: address.soilOrganic,
+        soilPhosphate: address.soilPhosphate,
+        soilPotassium: address.soilPotassium,
+        soilCalcium: address.soilCalcium,
+        soilMagnesium: address.soilMagnesium,
+        soilMoisture: address.soilMoisture,
+        airTemp: address.airTemp,
+        rain: address.rain,
+        soilDataSource: "사용자 입력값",
+        isFarmland: true, // 직접 입력이므로 팜맵 농지 확인은 건너뜀
+        landUseType: "시설재배(직접 입력)",
+        timestamp: new Date().toISOString(),
       };
+    } else {
+      // 1-1) 좌표/법정동코드 확보 (자동완성에서 고른 주소는 이미 있음, 아니면 지오코딩)
+      let lat = address?.lat;
+      let lng = address?.lng;
+      let stdgCd = address?.stdgCd || "";
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        const text = address?.address || address?.roadAddr || address?.jibunAddr || "";
+        if (!text) throw new Error("주소 정보가 없습니다.");
+        const hits = await kakaoGeocode(text);
+        if (!hits.length) throw new Error("주소를 찾을 수 없습니다. 정확한 농경지 주소를 입력해주세요.");
+        ({ lat, lng, stdgCd } = hits[0]);
+      }
+
+      // 1-2) 최근접 관측소 + 현재 시각
+      const station = nearestStation(lat, lng);
+      const { dateStr, timeStr } = nowDateTime();
+
+      // 1-3) 토양·기상·농지여부
+      const mergedRes = await fetch(
+        `${API_BASE_URL}/api/getMergedData?stationId=${station.id}&lat=${lat}&lng=${lng}` +
+          `&stdgCd=${encodeURIComponent(stdgCd)}&dateStr=${dateStr}&timeStr=${timeStr}`,
+        { signal: AbortSignal.timeout(20000) }
+      );
+      env = await mergedRes.json();
+      if (!mergedRes.ok) throw new Error(env.error || "토양·기상 데이터 수집 실패");
+
+      // 1-4) 등록된 농경지가 아니면(false) 차단. null(확인 실패)은 통과.
+      if (env.isFarmland === false) {
+        return {
+          error:
+            "입력하신 주소는 팜맵에 등록된 농경지가 아닙니다. 실제 농경지 주소인지 확인해주세요.",
+        };
+      }
     }
 
     // 5) 추천 (토양값을 쿼리로 전달)

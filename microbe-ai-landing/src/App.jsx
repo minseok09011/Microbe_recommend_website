@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import MicrobeAiLandingPage from "./LandingPage.jsx";
-import { CropSelect, AddressInput, LoadingScreen, ResultScreen, CheckScreen, CheckResultScreen } from "./AppFlow.jsx";
+import { CropSelect, AddressInput, ManualSoilInput, LoadingScreen, ResultScreen, CheckScreen, CheckResultScreen } from "./AppFlow.jsx";
 import { CROPS } from "./data.js";
 import LoginScreen from "./LoginScreen.jsx";
 import RecordsScreen from "./RecordsScreen.jsx";
 import { onAuthChange, signOut } from "./records.js";
 
 export default function App() {
-  const [view, setView] = useState("landing"); // landing | crop | address | loading | result | check | records
+  const [view, setView] = useState("landing"); // landing | crop | address | soilManual | loading | result | check | records
   const [crop, setCrop] = useState(null);
   const [address, setAddress] = useState(null);
   const [result, setResult] = useState(null);
@@ -101,7 +101,16 @@ export default function App() {
             onSelect={setAddress}
             onBack={() => setView("crop")}
             onNext={() => setView("loading")}
+            onManualSoil={() => setView("soilManual")}
             user={user}
+          />
+        );
+      case "soilManual":
+        return (
+          <ManualSoilInput
+            onSelect={setAddress}
+            onBack={() => setView("address")}
+            onNext={() => setView("loading")}
           />
         );
       case "loading":

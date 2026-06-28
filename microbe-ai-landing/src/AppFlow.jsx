@@ -111,7 +111,7 @@ export function CropSelect({ crop, onSelect, onBack, onNext }) {
 /* ──────────────────────────────────────────────────────────────
    STEP 2: 주소 입력
 ────────────────────────────────────────────────────────────── */
-export function AddressInput({ address, onSelect, onBack, onNext, user }) {
+export function AddressInput({ address, onSelect, onBack, onNext, onManualSoil, user }) {
   const [query, setQuery] = useState(address?.address || "");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -254,6 +254,109 @@ export function AddressInput({ address, onSelect, onBack, onNext, user }) {
         <button disabled={!address} onClick={onNext} className={`${PRIMARY_BTN} mt-2`}>
           🌱 추천받기
         </button>
+
+        {onManualSoil && (
+          <button
+            type="button"
+            onClick={onManualSoil}
+            className="mt-4 block w-full text-center text-xs font-semibold text-emerald-700 hover:underline"
+          >
+            🏠 시설재배(비닐하우스 등)라 주소 자동조회가 어려우신가요? 토양 정보 직접 입력하기
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   STEP 2-대체: 토양 정보 직접 입력 (시설재배 등 주소 자동조회가 어려운 경우)
+────────────────────────────────────────────────────────────── */
+const MANUAL_SOIL_FIELDS = [
+  { key: "soilPh", label: "토양 산도 (pH)", unit: "", placeholder: "예: 6.2", step: 0.1, min: 3, max: 10 },
+  { key: "soilOrganic", label: "유기물 함량", unit: "g/kg", placeholder: "예: 25", step: 0.1, min: 0 },
+  { key: "soilPhosphate", label: "유효인산", unit: "mg/kg", placeholder: "예: 300", step: 1, min: 0 },
+  { key: "soilPotassium", label: "칼륨 (K)", unit: "cmol+/kg", placeholder: "예: 0.6", step: 0.01, min: 0 },
+  { key: "soilCalcium", label: "칼슘 (Ca)", unit: "cmol+/kg", placeholder: "예: 5.5", step: 0.1, min: 0 },
+  { key: "soilMagnesium", label: "마그네슘 (Mg)", unit: "cmol+/kg", placeholder: "예: 1.8", step: 0.1, min: 0 },
+];
+
+// 토양 수분/기온/강수량은 보통 농민이 모르므로 입력칸에서 빼고 무난한 기본값으로 채운다.
+const MANUAL_SOIL_DEFAULTS = { soilMoisture: 25, airTemp: 20, rain: 0 };
+
+export function ManualSoilInput({ onSelect, onBack, onNext }) {
+  const [values, setValues] = useState({});
+
+  function setField(key, v) {
+    setValues((prev) => ({ ...prev, [key]: v }));
+  }
+
+  const filled = MANUAL_SOIL_FIELDS.every((f) => values[f.key] !== undefined && values[f.key] !== "");
+
+  function handleNext() {
+    const soil = {};
+    for (const f of MANUAL_SOIL_FIELDS) soil[f.key] = parseFloat(values[f.key]);
+    onSelect({
+      address: "직접 입력한 토양 정보 (시설재배 등)",
+      manualSoil: true,
+      ...MANUAL_SOIL_DEFAULTS,
+      ...soil,
+    });
+    onNext();
+  }
+
+  return (
+    <div className="min-h-screen bg-stone-50 flex flex-col">
+      <TopBar title="미생물 추천받기" onBack={onBack} />
+      <StepDots step={1} />
+      <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
+        <Reveal>
+          <h2 className="text-xl font-bold text-stone-900 mb-1">토양 정보를 직접 입력해주세요</h2>
+          <p className="text-sm text-stone-500 mb-6">
+            시설재배(비닐하우스 등)는 흙토람 데이터가 연동되지 않는 경우가 있어요.
+            토양검정 결과지의 값을 그대로 입력하시면 더 정확하게 추천해드려요.
+          </p>
+        </Reveal>
+
+        <Reveal delay={80}>
+          <div className="space-y-4 mb-6">
+            {MANUAL_SOIL_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="block text-sm font-semibold text-stone-700 mb-1.5">
+                  {f.label} {f.unit && <span className="text-stone-400 font-normal">({f.unit})</span>}
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step={f.step}
+                  min={f.min}
+                  max={f.max}
+                  value={values[f.key] ?? ""}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                  placeholder={f.placeholder}
+                  className="w-full rounded-xl border-2 border-stone-200 focus:border-emerald-500 px-4 py-3 text-sm outline-none transition-colors"
+                />
+              </div>
+            ))}
+          </div>
+        </Reveal>
+
+        <p className="text-xs text-stone-400 mb-4">
+          💡 토양검정 결과지가 없다면 관할{" "}
+          <a
+            href="https://www.rda.go.kr/young/board/board35.do"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-emerald-700 underline"
+          >
+            농업기술센터
+          </a>
+          에서 무료로 검정받을 수 있어요.
+        </p>
+
+        <button disabled={!filled} onClick={handleNext} className={`${PRIMARY_BTN} mt-2`}>
+          🌱 추천받기
+        </button>
       </div>
     </div>
   );
@@ -369,6 +472,7 @@ function SoilInfoPanel({ soilInfo }) {
     "실측값": { icon: "🛰️", className: "bg-emerald-50 text-emerald-700" },
     "지역 추정값": { icon: "📊", className: "bg-stone-100 text-stone-600" },
     "전국 평균값": { icon: "ℹ️", className: "bg-amber-50 text-amber-700" },
+    "사용자 입력값": { icon: "✍️", className: "bg-sky-50 text-sky-700" },
   };
   const badge = SOURCE_BADGE[soilInfo.soilDataSource];
 
@@ -517,17 +621,20 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
           <div className={`flex items-center rounded-2xl mb-3 text-xs overflow-hidden ${
             result.soilDataSource === "전국 평균값" ? "bg-amber-50 border border-amber-200 text-amber-800" :
             result.soilDataSource === "지역 추정값" ? "bg-stone-100 border border-stone-200 text-stone-600" :
+            result.soilDataSource === "사용자 입력값" ? "bg-sky-50 border border-sky-200 text-sky-800" :
             "bg-emerald-50 border border-emerald-100 text-emerald-800"
           }`}>
             <div className="flex-1 p-3">
               <p className="font-bold mb-1">
                 {result.soilDataSource === "전국 평균값" ? "ℹ️ 전국 평균값" :
                  result.soilDataSource === "지역 추정값" ? "📊 지역 추정값" :
+                 result.soilDataSource === "사용자 입력값" ? "✍️ 사용자 입력값" :
                  "🛰️ 실측값"}
               </p>
               <p className="leading-relaxed">
                 {result.soilDataSource === "전국 평균값" ? "실측 데이터가 없어 전국 평균으로 추천했어요" :
                  result.soilDataSource === "지역 추정값" ? "해당 지역 토양 통계로 추정한 값이에요" :
+                 result.soilDataSource === "사용자 입력값" ? "직접 입력하신 토양검정 값 기준이에요" :
                  "실측 토양검정 데이터 기준이에요"}
               </p>
               {(result.soilDataSource === "지역 추정값" || result.soilDataSource === "전국 평균값") && (
@@ -548,6 +655,7 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
                 <div className={`w-px self-stretch my-3 ${
                   result.soilDataSource === "전국 평균값" ? "bg-amber-200" :
                   result.soilDataSource === "지역 추정값" ? "bg-stone-300" :
+                  result.soilDataSource === "사용자 입력값" ? "bg-sky-200" :
                   "bg-emerald-200"
                 }`} />
                 <div className="flex-shrink-0 p-3 text-center flex flex-col justify-center">

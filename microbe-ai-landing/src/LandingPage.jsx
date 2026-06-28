@@ -1,14 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  ChevronDown,
-  Sprout,
-  FlaskConical,
-  Microscope,
-  BookOpen,
-  CloudSun,
-  Languages,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, Sprout, Microscope } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
    레퍼런스(webee) 사이트의 "스크롤 시 fade-up" 패턴을 그대로 구현한
@@ -86,14 +77,6 @@ function Eyebrow({ children, light = false }) {
     >
       {children}
     </p>
-  );
-}
-
-function IconBox({ icon: Icon, className = "", iconClassName = "h-6 w-6 text-white" }) {
-  return (
-    <div className={`flex items-center justify-center rounded-xl flex-shrink-0 ${className}`}>
-      <Icon className={iconClassName} />
-    </div>
   );
 }
 
@@ -281,84 +264,9 @@ function OurSolution() {
                   </div>
                 ))}
               </div>
-
-              <div className="mt-8 flex justify-end">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-amber-600" />
-                  <span className="text-sm font-semibold text-stone-900">CORE FEATURES</span>
-                </div>
-              </div>
             </div>
           </div>
         </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────
-   4. CORE FEATURES — 2x4 카드 (이미지 자리는 그라디언트+아이콘 placeholder)
-────────────────────────────────────────────────────────────── */
-function CoreFeatures() {
-  const features = [
-    {
-      title: "정밀 토양 분석",
-      icon: FlaskConical,
-      gradient: "from-emerald-600/80 to-emerald-400/40",
-      desc: "pH, 유기물, 배수 등급 등 27가지 흙토람 데이터를 기반으로 내 밭의 흙 상태를 완벽히 진단합니다.",
-    },
-    {
-      title: "AI 학술 논문 처방",
-      icon: BookOpen,
-      gradient: "from-amber-600/80 to-amber-400/40",
-      desc: "검증된 A급 최상위 논문 1,764편을 학습한 RAG 시스템이 환각(Hallucination) 없이 정확한 미생물을 추천합니다.",
-    },
-    {
-      title: "기상 연동 살포 신호등",
-      icon: CloudSun,
-      gradient: "from-sky-600/80 to-sky-400/40",
-      desc: "농업 기상 10분 데이터와 일기예보를 결합하여 미생물을 뿌리기 가장 좋은 타이밍을 알려줍니다.",
-    },
-    {
-      title: "농민 맞춤형 UI",
-      icon: Languages,
-      gradient: "from-emerald-600/80 to-emerald-400/40",
-      desc: "어려운 학술 용어 대신 '토마토, 병 막기, 미생물 약제' 등 직관적인 농민의 언어로 번역되어 제공됩니다.",
-    },
-  ];
-
-  return (
-    <section className="relative bg-white py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <Reveal className="text-center mb-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-stone-900 mb-2">핵심 기능</h2>
-          <p className="text-stone-500">토비오와 함께 더 확실한 토양 관리를 경험하세요</p>
-        </Reveal>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {features.map((f, i) => (
-            <Reveal key={f.title} delay={i * 80}>
-              <div className="group rounded-xl bg-stone-50 border border-stone-200/70 overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                <div className="relative h-16 overflow-hidden bg-gradient-to-br from-stone-200 to-stone-100 flex items-center justify-center">
-                  <f.icon className="h-8 w-8 text-stone-400" />
-                </div>
-                <div className="p-3">
-                  <div className="flex items-center gap-2">
-                    <IconBox
-                      icon={f.icon}
-                      className={`w-8 h-8 bg-gradient-to-br ${f.gradient}`}
-                      iconClassName="h-4 w-4 text-white"
-                    />
-                    <h3 className="text-sm font-semibold text-stone-900">{f.title}</h3>
-                  </div>
-                  <div className="overflow-hidden max-h-0 opacity-0 group-hover:max-h-40 group-hover:opacity-100 group-hover:mt-2 transition-all duration-300">
-                    <p className="text-stone-500 text-xs leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -423,7 +331,6 @@ export default function MicrobeAiLandingPage({ onStartRecommend, onStartCheck, u
         onMyRecords={onMyRecords}
       />
       <OurSolution />
-      <CoreFeatures />
       <ContactFooter />
     </div>
   );
