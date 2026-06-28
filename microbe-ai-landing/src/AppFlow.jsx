@@ -922,13 +922,6 @@ export function ResultScreen({ result, crop, address, onCheck, onHome }) {
             <summary className="cursor-pointer text-sm font-semibold text-stone-900 select-none">
               📄 더보기 — 논문 근거로 살펴보기
             </summary>
-            {evidenceStars && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-sm font-bold text-stone-900">논문 근거 강도</span>
-                <span className="text-amber-500 text-base leading-none tracking-tight" aria-label={`근거 강도 ${result.evidenceConfidence}`}>{evidenceStars}</span>
-                {Number.isFinite(topScore) && <span className="text-xs text-stone-400">(유사도 {topScore.toFixed(2)})</span>}
-              </div>
-            )}
             {scientificEvidence && (
               <p className="mt-3 text-sm text-stone-700 leading-relaxed">{scientificEvidence}</p>
             )}
