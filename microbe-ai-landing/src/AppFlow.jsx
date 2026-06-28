@@ -259,9 +259,11 @@ export function AddressInput({ address, onSelect, onBack, onNext, onManualSoil, 
           <button
             type="button"
             onClick={onManualSoil}
-            className="mt-4 block w-full text-center text-xs font-semibold text-emerald-700 hover:underline"
+            className="mt-4 block w-full text-center text-xs font-semibold leading-relaxed text-emerald-700 hover:underline"
           >
-            🏠 시설재배(비닐하우스 등)라 주소 자동조회가 어려우신가요? 토양 정보 직접 입력하기
+            🏠 시설재배(비닐하우스 등)라 주소 자동조회가 어려우신가요?
+            <br />
+            토양 정보 직접 입력하기
           </button>
         )}
       </div>
