@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   CROPS,
+  PURPOSES,
   LOAD_STEPS,
   delay,
   searchAddress,
@@ -74,7 +75,7 @@ export function CropSelect({ crop, onSelect, onBack, onNext }) {
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       <TopBar title="미생물 추천받기" onBack={onBack} />
-      <StepDots step={0} />
+      <StepDots step={0} total={3} />
       <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
         <Reveal>
           <h2 className="text-xl font-bold text-stone-900 mb-1">어떤 작물을 재배하시나요?</h2>
@@ -109,7 +110,49 @@ export function CropSelect({ crop, onSelect, onBack, onNext }) {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   STEP 2: 주소 입력
+   STEP 2: 목적 선택
+────────────────────────────────────────────────────────────── */
+export function PurposeSelect({ purpose, onSelect, onBack, onNext }) {
+  return (
+    <div className="min-h-screen bg-stone-50 flex flex-col">
+      <TopBar title="미생물 추천받기" onBack={onBack} />
+      <StepDots step={1} total={3} />
+      <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
+        <Reveal>
+          <h2 className="text-xl font-bold text-stone-900 mb-1">어떤 목적으로 찾으시나요?</h2>
+          <p className="text-sm text-stone-500 mb-6">목적에 맞는 미생물을 우선 추천해드려요</p>
+        </Reveal>
+
+        <Reveal delay={80}>
+          <div className="grid grid-cols-2 gap-3 mb-8">
+            {PURPOSES.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p.id)}
+                className={`rounded-xl border-2 py-4 px-3 text-left transition-all ${
+                  purpose === p.id
+                    ? "border-emerald-600 bg-emerald-50 -translate-y-0.5 shadow-sm"
+                    : "border-stone-200 bg-white hover:border-emerald-300"
+                }`}
+              >
+                <div className="text-2xl mb-1">{p.icon}</div>
+                <div className="text-sm font-semibold text-stone-800">{p.name}</div>
+                <div className="text-xs text-stone-500 mt-0.5">{p.desc}</div>
+              </button>
+            ))}
+          </div>
+        </Reveal>
+
+        <button disabled={!purpose} onClick={onNext} className={PRIMARY_BTN}>
+          다음
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   STEP 3: 주소 입력
 ────────────────────────────────────────────────────────────── */
 export function AddressInput({ address, onSelect, onBack, onNext, onManualSoil, user }) {
   const [query, setQuery] = useState(address?.address || "");
@@ -176,7 +219,7 @@ export function AddressInput({ address, onSelect, onBack, onNext, onManualSoil, 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       <TopBar title="미생물 추천받기" onBack={onBack} />
-      <StepDots step={1} />
+      <StepDots step={2} total={3} />
       <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
         <Reveal>
           <h2 className="text-xl font-bold text-stone-900 mb-1">농경지 주소를 알려주세요</h2>
@@ -310,7 +353,7 @@ export function ManualSoilInput({ onSelect, onBack, onNext }) {
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       <TopBar title="미생물 추천받기" onBack={onBack} />
-      <StepDots step={1} />
+      <StepDots step={2} total={3} />
       <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
         <Reveal>
           <h2 className="text-xl font-bold text-stone-900 mb-1">토양 정보를 직접 입력해주세요</h2>
@@ -367,7 +410,7 @@ export function ManualSoilInput({ onSelect, onBack, onNext }) {
 /* ──────────────────────────────────────────────────────────────
    로딩 화면 — 토비오 걷기 애니메이션 + 진행 단계
 ────────────────────────────────────────────────────────────── */
-export function LoadingScreen({ crop, address, onDone }) {
+export function LoadingScreen({ crop, purpose, address, onDone }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [pct, setPct] = useState(0);
   const [waking, setWaking] = useState(false);
@@ -378,7 +421,7 @@ export function LoadingScreen({ crop, address, onDone }) {
 
     async function run() {
       const STEP_DELAYS = [800, 2200, 1800, 0];
-      const apiPromise = fetchRecommend(crop, address, (w) => {
+      const apiPromise = fetchRecommend(crop, purpose, address, (w) => {
         if (!cancelled) setWaking(w);
       });
 

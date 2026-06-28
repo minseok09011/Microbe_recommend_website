@@ -41,6 +41,14 @@ export const CROPS = [
   { id: "ginseng", icon: "🥕", name: "인삼" },
 ];
 
+// 추천 목적 — id는 백엔드 /api/recommendMicrobe?purpose= 와 정확히 일치해야 함.
+export const PURPOSES = [
+  { id: "soil",    icon: "🌱", name: "생육·토양", desc: "뿌리 활착·양분 흡수·토양 개선" },
+  { id: "disease", icon: "🛡️", name: "병해 억제", desc: "곰팡이·세균병 길항 미생물" },
+  { id: "pest",    icon: "🐛", name: "해충 억제", desc: "곤충·선충 방제 미생물" },
+  { id: "general", icon: "✨", name: "전반 추천", desc: "목적 구분 없이 종합 추천" },
+];
+
 export const LOAD_STEPS = [
   { id: "ls0", icon: "📍", label: "농경지 위치 확인 중...", doneLabel: "농경지 위치 확인 완료" },
   { id: "ls1", icon: "🌤️", label: "기상·토양 데이터 수집 중...", doneLabel: "기상·토양 데이터 수집 완료" },
@@ -177,7 +185,7 @@ async function ensureBackendAwake({ requireIndex } = {}, onStatus) {
   return false; // 데드라인 초과
 }
 
-export async function fetchRecommend(crop, address, onStatus) {
+export async function fetchRecommend(crop, purpose, address, onStatus) {
   try {
     // 0) 백엔드 cold-start 선깨우기 — 인덱스 로드까지 기다려야 recommendMicrobe가 503 안 줌
     const awake = await ensureBackendAwake({ requireIndex: true }, onStatus);
@@ -242,6 +250,7 @@ export async function fetchRecommend(crop, address, onStatus) {
     // 5) 추천 (토양값을 쿼리로 전달)
     const params = new URLSearchParams({
       crop,
+      purpose: purpose || "soil", // 안전 폴백(백엔드 기본값과 동일). 토양과 무관해 getMergedData엔 안 보냄
       soilPh: env.soilPh,
       soilOrganic: env.soilOrganic,
       soilPhosphate: env.soilPhosphate,

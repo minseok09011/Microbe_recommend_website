@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import MicrobeAiLandingPage from "./LandingPage.jsx";
-import { CropSelect, AddressInput, ManualSoilInput, LoadingScreen, ResultScreen, CheckScreen, CheckResultScreen } from "./AppFlow.jsx";
+import { CropSelect, PurposeSelect, AddressInput, ManualSoilInput, LoadingScreen, ResultScreen, CheckScreen, CheckResultScreen } from "./AppFlow.jsx";
 import { CROPS } from "./data.js";
 import LoginScreen from "./LoginScreen.jsx";
 import RecordsScreen from "./RecordsScreen.jsx";
 import { onAuthChange, signOut } from "./records.js";
 
 export default function App() {
-  const [view, setView] = useState("landing"); // landing | crop | address | soilManual | loading | result | check | records
+  const [view, setView] = useState("landing"); // landing | crop | purpose | address | soilManual | loading | result | check | records
   const [crop, setCrop] = useState(null);
+  const [purpose, setPurpose] = useState(null);
   const [address, setAddress] = useState(null);
   const [result, setResult] = useState(null);
   const [checkPrefill, setCheckPrefill] = useState({ microbe: "", crop: "" });
@@ -36,6 +37,7 @@ export default function App() {
 
   function startRecommend() {
     setCrop(null);
+    setPurpose(null);
     setAddress(null);
     setViewingRecord(false);
     setView("crop");
@@ -62,6 +64,7 @@ export default function App() {
     } else {
       setResult(r.payload.result || r.payload);
       setCrop(r.payload.crop ?? null);
+      setPurpose(r.payload.purpose ?? "soil"); // 과거 기록엔 purpose 없음 — 다시보기는 재요청 안 하므로 결과 영향 없음
       setAddress(r.payload.address ? { address: r.payload.address } : null);
       setView("result");
     }
@@ -93,13 +96,22 @@ export default function App() {
       case "login":
         return <LoginScreen onBack={goHome} onLogin={handleLogin} />;
       case "crop":
-        return <CropSelect crop={crop} onSelect={setCrop} onBack={goHome} onNext={() => setView("address")} />;
+        return <CropSelect crop={crop} onSelect={setCrop} onBack={goHome} onNext={() => setView("purpose")} />;
+      case "purpose":
+        return (
+          <PurposeSelect
+            purpose={purpose}
+            onSelect={setPurpose}
+            onBack={() => setView("crop")}
+            onNext={() => setView("address")}
+          />
+        );
       case "address":
         return (
           <AddressInput
             address={address}
             onSelect={setAddress}
-            onBack={() => setView("crop")}
+            onBack={() => setView("purpose")}
             onNext={() => setView("loading")}
             onManualSoil={() => setView("soilManual")}
             user={user}
@@ -114,7 +126,7 @@ export default function App() {
           />
         );
       case "loading":
-        return <LoadingScreen crop={crop} address={address} onDone={handleLoadingDone} />;
+        return <LoadingScreen crop={crop} purpose={purpose} address={address} onDone={handleLoadingDone} />;
       case "result":
         return (
           <ResultScreen result={result} crop={crop} address={address} onCheck={goToCheckFromResult} onHome={backFromResult} />
