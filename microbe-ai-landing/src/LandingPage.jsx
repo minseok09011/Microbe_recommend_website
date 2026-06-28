@@ -334,8 +334,8 @@ function CoreFeatures() {
                 <div className="relative h-16 overflow-hidden bg-gradient-to-br from-stone-200 to-stone-100 flex items-center justify-center">
                   <f.icon className="h-8 w-8 text-stone-400" />
                 </div>
-                <div className="p-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
+                <div className="p-3">
+                  <div className="flex items-center gap-2">
                     <IconBox
                       icon={f.icon}
                       className={`w-8 h-8 bg-gradient-to-br ${f.gradient}`}
