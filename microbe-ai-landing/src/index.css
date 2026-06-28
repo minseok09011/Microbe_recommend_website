@@ -6,3 +6,8 @@
   0%, 100% { transform: translateX(-50%) translateY(0); }
   50% { transform: translateX(-50%) translateY(-4px); }
 }
+
+/* 토비오 PNG 애니메이션 전용 — 배경제거 잔여 알파(쩜쩜쩜 잔점) 제거 */
+.tobio-edge-clean {
+  filter: url(#tobio-edge-clean);
+}
