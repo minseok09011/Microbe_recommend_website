@@ -1514,8 +1514,8 @@ export function CheckResultScreen({ result, onBack }) {
   // 판정 도형 아이콘 — safe: 초록 원+체크 / wait: 주황 세모+느낌표 (헤더 그라데이션 위라 흰 원 배경에 얹음)
   const verdictIcon = safe ? (
     <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
-      <circle cx="20" cy="20" r="18" fill="#3b82f6" />
-      <circle cx="20" cy="20" r="10" fill="none" stroke="#fff" strokeWidth="3" />
+      <circle cx="20" cy="20" r="18" fill="#fff" />
+      <circle cx="20" cy="20" r="12" fill="none" stroke="#3b82f6" strokeWidth="3.5" />
     </svg>
   ) : (
     <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
