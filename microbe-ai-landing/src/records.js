@@ -100,9 +100,25 @@ export async function updatePassword(newPassword) {
   return data;
 }
 
+// 중복 기록 확인 — 같은 kind + crop + summary 조합이 이미 있는지
+export async function checkDuplicateRecord(kind, crop, summary) {
+  if (!supabase) return false;
+  let query = supabase
+    .from("records")
+    .select("id", { count: "exact", head: true })
+    .eq("kind", kind);
+  if (crop) query = query.eq("crop", crop);
+  if (summary) query = query.eq("summary", summary);
+  const { count, error } = await query;
+  if (error) return false;
+  return (count || 0) > 0;
+}
+
 // 기록 저장 — user_id 미포함(RLS 기본값 auth.uid())
 export async function saveRecord(rec) {
   ensure();
+  const isDup = await checkDuplicateRecord(rec.kind, rec.crop, rec.summary);
+  if (isDup) throw new Error("이미 기록한 결과입니다.");
   const { data, error } = await supabase
     .from("records")
     .insert({
