@@ -383,7 +383,7 @@ function ServiceShowcase() {
       title: "AI 맞춤 미생물 추천",
       desc: "주소와 작물만 입력하면, 실시간 토양·기상 데이터를 분석해 A급 논문 1,764편 근거의 최적 미생물을 추천합니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto">
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
           <div className="bg-gradient-to-br from-emerald-800 to-emerald-600 rounded-xl p-4 mb-4 text-white">
             <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">AI Recommendation</p>
             <p className="font-bold text-sm">토비오의 미생물 추천</p>
@@ -410,7 +410,7 @@ function ServiceShowcase() {
       title: "실제 판매처 바로 연결",
       desc: "추천된 미생물의 등록 제품 수, 가격대, 연락처까지 한눈에 비교하고 온라인 구매로 바로 연결됩니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto">
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
           <div className="bg-amber-400 rounded-t-lg px-3 py-2 flex items-center gap-1.5">
             <span className="text-xs font-bold text-black">토비오의 최고 추천</span>
           </div>
@@ -443,7 +443,7 @@ function ServiceShowcase() {
       title: "살포 안전일 자동 계산",
       desc: "최근 뿌린 농약·비료를 입력하면, 미생물이 죽지 않는 안전한 살포 시기를 신호등으로 알려드립니다.",
       card: (
-        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto">
+        <div className="bg-white rounded-2xl shadow-md p-5 text-left w-full max-w-xs mx-auto" style={{ minHeight: 420 }}>
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-center mb-3">
             <p className="text-2xl mb-1">🟡</p>
             <p className="font-bold text-amber-700 text-sm">조금 더 기다리는 게 좋아요</p>
