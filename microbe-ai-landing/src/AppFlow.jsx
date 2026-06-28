@@ -1404,23 +1404,67 @@ export function CheckResultScreen({ result, onBack }) {
   const safe = result.verdict === "safe";
   const g = result.governingMaterial;
 
+  // 판정 도형 아이콘 — safe: 초록 원+체크 / wait: 주황 세모+느낌표 (헤더 그라데이션 위라 흰 원 배경에 얹음)
+  const verdictIcon = safe ? (
+    <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="18" fill="#10b981" />
+      <path d="M12 20l5 5 11-11" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M20 4 L37 34 H3 Z" fill="#f59e0b" />
+      <rect x="18.5" y="14" width="3" height="11" rx="1.5" fill="#fff" />
+      <circle cx="20" cy="29" r="1.8" fill="#fff" />
+    </svg>
+  );
+
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       <TopBar title="살포 확인 결과" onBack={onBack} backLabel="홈" />
       <div className="flex-1 max-w-lg w-full mx-auto px-5 py-6">
         <Reveal>
           <div className="space-y-3">
-            {/* 핵심 판정 */}
-            <div className={`rounded-2xl p-5 ${safe ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-300"}`}>
-              <div className="text-3xl mb-1">{safe ? "🟢" : "🟡"}</div>
-              <h4 className={`font-bold mb-1 ${safe ? "text-emerald-800" : "text-amber-700"}`}>
-                {safe ? "지금 살포해도 괜찮아요" : "조금 더 기다리는 게 좋아요"}
-              </h4>
-              <p className="text-sm text-stone-700 leading-relaxed">{result.headline}</p>
-              {result.safeDate && (
-                <p className="mt-2 text-sm font-semibold text-stone-800">📅 권장 살포 가능일: {result.safeDate}</p>
-              )}
+            {/* 핵심 판정 — 추천 결과 톤(그라데이션 헤더 + 배지 + 토비오 + 판정 도형) */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-600 text-white p-5">
+              <img
+                src="img/tobio.png"
+                alt=""
+                className="absolute -right-4 -bottom-6 h-28 w-auto object-contain opacity-90"
+              />
+              <div className="relative">
+                <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/80 mb-2">
+                  Spray Check
+                </span>
+                <div className="flex items-center gap-3 mb-1.5">
+                  <span className="shrink-0 inline-flex items-center justify-center h-11 w-11 rounded-full bg-white/95">
+                    {verdictIcon}
+                  </span>
+                  <h2 className="font-bold text-lg">
+                    {safe ? "지금 살포해도 괜찮아요" : "조금 더 기다리는 게 좋아요"}
+                  </h2>
+                </div>
+                {result.headline && <p className="text-sm text-white/85 leading-relaxed">{result.headline}</p>}
+                {result.safeDate && (
+                  <p className="mt-2 text-sm font-semibold">📅 권장 살포 가능일: {result.safeDate}</p>
+                )}
+              </div>
             </div>
+
+            {/* 왜 이렇게 안내했나요 — 기존 governingMaterial 값으로 서사 설명(새 필드 없음) */}
+            {g && (
+              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 text-sm leading-relaxed">
+                <p className="font-bold text-stone-800 mb-1">💡 왜 이렇게 안내했나요?</p>
+                <p className="text-stone-700">
+                  최근 <strong>{g.appliedDate}</strong>에 살포하신 <strong>{g.name}</strong>
+                  {g.family ? `(${g.family})` : ""}이(가) 미생물에 가장 큰 영향을 줘요.
+                  이 자재는 권장 간격이 약 <strong>{g.term}일</strong>이라,
+                  {safe
+                    ? " 이미 안전 구간에 들어왔어요."
+                    : ` 살포 후 그만큼 지난 ${result.safeDate} 이후에 미생물을 뿌리는 게 안전해요.`}
+                  {" "}여러 자재가 있을 땐 가장 늦게 풀리는 날짜를 기준으로 잡아요(겹쳐 더하지 않아요).
+                </p>
+              </div>
+            )}
 
             {/* 발목 잡는 자재 */}
             {g && (
