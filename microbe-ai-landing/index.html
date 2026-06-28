@@ -6,17 +6,6 @@
     <title>TOBio 토비오 — AI 토양 맞춤형 미생물 추천</title>
   </head>
   <body>
-    <!-- 토비오 PNG들의 배경제거 잔여 알파(반투명 잔점) 제거용 필터. 알파를 50%에서 끊어
-         흐릿한 점들은 완전히 지우고, 본체는 완전히 칠해서 애니메이션 중 "쩜쩜쩜" 잔상을 막는다. -->
-    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-      <defs>
-        <filter id="tobio-edge-clean">
-          <feComponentTransfer>
-            <feFuncA type="discrete" tableValues="0 0 0 0 0 1 1 1 1 1" />
-          </feComponentTransfer>
-        </filter>
-      </defs>
-    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

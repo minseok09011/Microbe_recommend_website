@@ -9,7 +9,6 @@ import {
   CloudSun,
   Languages,
 } from "lucide-react";
-import TobioRoamer from "./TobioRoamer.jsx";
 
 /* ──────────────────────────────────────────────────────────────
    레퍼런스(webee) 사이트의 "스크롤 시 fade-up" 패턴을 그대로 구현한
@@ -284,8 +283,6 @@ function OurSolution() {
             </div>
           </div>
         </Reveal>
-
-        <TobioRoamer />
       </div>
     </section>
   );
