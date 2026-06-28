@@ -8,6 +8,7 @@ import {
   BookOpen,
   CloudSun,
   Languages,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
@@ -452,17 +453,34 @@ function ServiceShowcase() {
             <p className="font-bold text-amber-700 text-base">조금 더 기다리는 게 좋아요</p>
             <p className="text-sm text-stone-700 mt-1">권장 살포 가능일: 2026-07-12</p>
           </div>
-          <div className="bg-white border border-stone-200 rounded-lg p-3 mb-2">
-            <p className="text-xs font-bold text-stone-500 mb-1.5">가장 영향이 큰 자재</p>
-            <p className="text-sm text-stone-700">🔴 <strong>석회황</strong> (석회유황합제) — 14일</p>
-          </div>
           <div className="bg-white border border-stone-200 rounded-lg p-3">
-            <p className="text-xs font-bold text-stone-500 mb-1.5">자재별 안전 해제일</p>
-            <div className="flex justify-between text-xs text-stone-600 mb-1">
-              <span>🔴 석회황</span><span>2026-07-12 (14일)</span>
-            </div>
-            <div className="flex justify-between text-xs text-stone-600">
-              <span>🟢 다트롤</span><span>2026-06-28 (0일)</span>
+            <p className="text-xs font-bold text-stone-500 mb-2">자재별 안전 해제일</p>
+            <div className="divide-y divide-stone-100">
+              <div className="py-2 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0 bg-rose-500" />
+                  <span className="text-sm font-medium text-stone-800">
+                    석회황<span className="font-normal text-stone-400"> · 석회유황합제</span>
+                  </span>
+                </div>
+                <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-stone-400 whitespace-nowrap">위험 · 14일</span>
+                  <span className="text-sm font-semibold text-stone-800 whitespace-nowrap">2026-07-12</span>
+                </div>
+                <div className="mt-1.5 ml-3.5 inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+                  <AlertTriangle size={10} /> 가장 큰 영향
+                </div>
+              </div>
+              <div className="py-2 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-500" />
+                  <span className="text-sm font-medium text-stone-800">다트롤</span>
+                </div>
+                <div className="mt-1 ml-3.5 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-stone-400 whitespace-nowrap">안전 · 0일</span>
+                  <span className="text-sm font-semibold text-stone-800 whitespace-nowrap">2026-06-28</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
