@@ -361,17 +361,19 @@ function CoreFeatures() {
 ────────────────────────────────────────────────────────────── */
 function ServiceShowcase() {
   const [current, setCurrent] = useState(0);
-  const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState(1);
 
+  const [phase, setPhase] = useState("visible"); // visible | slideOut | fadeIn
+
   function goTo(next) {
-    if (animating || next === current) return;
+    if (phase !== "visible" || next === current) return;
     setDirection(next > current ? 1 : -1);
-    setAnimating(true);
+    setPhase("slideOut");
     setTimeout(() => {
       setCurrent(next);
-      setTimeout(() => setAnimating(false), 50);
-    }, 250);
+      setPhase("fadeIn");
+      setTimeout(() => setPhase("visible"), 50);
+    }, 300);
   }
 
   const slides = [
@@ -474,13 +476,13 @@ function ServiceShowcase() {
         </Reveal>
 
         <Reveal delay={100}>
-          <div className="relative max-w-sm mx-auto overflow-hidden">
+          <div className="relative max-w-sm mx-auto overflow-hidden" style={{ minHeight: 520 }}>
             <div
               className="transition-all duration-300 ease-in-out"
               style={{
-                opacity: animating ? 0 : 1,
-                transform: animating
-                  ? `translateX(${direction * 40}px)`
+                opacity: phase === "visible" ? 1 : 0,
+                transform: phase === "slideOut"
+                  ? `translateX(${direction * -60}px)`
                   : "translateX(0)",
               }}
             >
