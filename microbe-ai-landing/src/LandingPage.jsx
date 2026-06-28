@@ -166,7 +166,6 @@ function Hero({ onStartRecommend, onStartCheck, user, onLoginClick, onLogout, on
               className="inline-flex items-center justify-center gap-2 whitespace-nowrap bg-white/15 backdrop-blur-sm border-2 border-white text-white hover:bg-white/25 font-bold w-52 py-4 text-base rounded-md transition-colors"
             >
               미생물 추천받기
-              <ArrowRight className="h-5 w-5" />
             </button>
             <button
               onClick={onStartCheck}
