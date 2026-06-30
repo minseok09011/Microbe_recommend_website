@@ -114,6 +114,91 @@ const CACHE_TTL_MS = 3 * 3600 * 1000;
 const _staleCache = new Map();
 const STALE_TTL_MS = 24 * 3600 * 1000;
 
+// ── Open-Meteo 백업 API (무료/무인증) ─────────────────────────────────────
+// KMA가 완전 다운(전체 좌표 502/429)되고 stale cache도 비었을 때 최종 폴백.
+// 한국 기상청보다 정밀도는 낮지만 살포일 판정(강수/기온/구름)엔 충분.
+// 응답을 KMA aggregate 형식({date, tmn, tmx, maxPop, sumPcpMm, maxPcpMm,
+// anyHeavyRain, avgReh, skyWorst, maxWsd, hourly})으로 변환해 bestApplyDay()가
+// 그대로 사용할 수 있게 한다.
+const OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast";
+
+async function fetchOpenMeteoForecast(lat, lon) {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    hourly: "temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,cloud_cover",
+    daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
+    timezone: "Asia/Seoul",
+    forecast_days: "4",
+  });
+  const res = await fetch(`${OPENMETEO_URL}?${params}`, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
+  return res.json();
+}
+
+function _openMeteoToKmaFormat(json) {
+  const daily = json.daily || {};
+  const hourly = json.hourly || {};
+  const dailyTimes = daily.time || []; // ["2026-06-30", ...]
+  const hourlyTimes = hourly.time || []; // ["2026-06-30T00:00", ...]
+
+  // hourly 인덱스를 일자별로 그룹핑
+  const hourlyByDay = new Map();
+  hourlyTimes.forEach((t, i) => {
+    const day = String(t).slice(0, 10);
+    if (!hourlyByDay.has(day)) hourlyByDay.set(day, []);
+    hourlyByDay.get(day).push(i);
+  });
+
+  const days = [];
+  for (let di = 0; di < dailyTimes.length; di++) {
+    const iso = dailyTimes[di]; // "2026-06-30"
+    const yyyymmdd = iso.replace(/-/g, "");
+    const indices = hourlyByDay.get(iso) || [];
+
+    const pcps = indices.map((i) => hourly.precipitation?.[i]).filter((v) => Number.isFinite(v));
+    const rehs = indices.map((i) => hourly.relative_humidity_2m?.[i]).filter((v) => Number.isFinite(v));
+    const clouds = indices.map((i) => hourly.cloud_cover?.[i]).filter((v) => Number.isFinite(v));
+
+    const maxPcpMm = pcps.length ? Math.max(...pcps) : 0;
+    const sumPcpMm = pcps.reduce((a, b) => a + b, 0);
+    const avgReh = rehs.length ? Math.round(rehs.reduce((a, b) => a + b, 0) / rehs.length) : null;
+    // 구름량(%) 평균 → KMA SKY 코드(1맑음 / 3구름많음 / 4흐림)에 근사 매핑
+    let skyWorst = null;
+    if (clouds.length) {
+      const avgCloud = clouds.reduce((a, b) => a + b, 0) / clouds.length;
+      skyWorst = avgCloud < 30 ? 1 : avgCloud < 70 ? 3 : 4;
+    }
+
+    // KMA hourly 호환 형식 — TMP/POP/PCP만 (PTY는 Open-Meteo에 직접 매칭 어려워 생략)
+    const hourlyOut = [];
+    for (const i of indices) {
+      const time = String(hourlyTimes[i] || "").slice(11, 16).replace(":", "");
+      const tmp = hourly.temperature_2m?.[i];
+      const pop = hourly.precipitation_probability?.[i];
+      const pcp = hourly.precipitation?.[i];
+      if (Number.isFinite(tmp)) hourlyOut.push({ time, category: "TMP", value: String(tmp) });
+      if (Number.isFinite(pop)) hourlyOut.push({ time, category: "POP", value: String(pop) });
+      if (Number.isFinite(pcp) && pcp > 0) hourlyOut.push({ time, category: "PCP", value: String(pcp) });
+    }
+
+    days.push({
+      date: yyyymmdd,
+      tmn: daily.temperature_2m_min?.[di] ?? null,
+      tmx: daily.temperature_2m_max?.[di] ?? null,
+      maxPop: daily.precipitation_probability_max?.[di] ?? 0,
+      sumPcpMm,
+      maxPcpMm,
+      anyHeavyRain: maxPcpMm >= 5,
+      avgReh,
+      skyWorst,
+      maxWsd: daily.wind_speed_10m_max?.[di] ?? null,
+      hourly: hourlyOut,
+    });
+  }
+  return days;
+}
+
 function _aggregateDaily(items) {
   // fcstDate별로 카테고리를 모은다.
   const byDate = new Map();
@@ -225,6 +310,20 @@ async function fetchVilageForecast(lat, lon, now = new Date()) {
     console.warn(`⚠️ KMA 일시 실패 → stale cache 반환 (nx=${nx},ny=${ny}, 저장 ${Math.round((Date.now() - stale.savedAt) / 60000)}분 전)`);
     return stale.data;
   }
+
+  // stale cache도 없으면 Open-Meteo 백업 호출 — KMA 완전 다운 상황에서도 살포일 판정 유지
+  try {
+    console.warn(`⚠️ KMA 완전 실패 + stale 없음 → Open-Meteo 백업 호출 (lat=${lat},lon=${lon})`);
+    const ometJson = await fetchOpenMeteoForecast(lat, lon);
+    const days = _openMeteoToKmaFormat(ometJson);
+    if (!Array.isArray(days) || days.length === 0) throw new Error("Open-Meteo 응답 비어 있음");
+    // Open-Meteo 응답도 stale cache에 넣어둠 — 다음 KMA 실패 시 즉시 사용
+    _staleCache.set(staleKey, { data: days, savedAt: Date.now() });
+    return days;
+  } catch (omErr) {
+    console.error("❌ Open-Meteo 백업도 실패:", omErr.message);
+  }
+
   throw lastErr || new Error("기상청 API 호출 실패");
 }
 
